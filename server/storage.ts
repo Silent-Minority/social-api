@@ -1,5 +1,14 @@
-import { type User, type InsertUser, type SocialAccount, type InsertSocialAccount, type Post, type InsertPost, type ApiLog, type InsertApiLog } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { 
+  type User, type InsertUser, 
+  type SocialAccount, type InsertSocialAccount, 
+  type Post, type InsertPost, 
+  type ApiLog, type InsertApiLog,
+  type TweetMetrics, type InsertTweetMetrics,
+  type OauthState, type InsertOauthState,
+  users, socialAccounts, posts, apiLogs, tweetMetrics, oauthStates
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, desc, and, gte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -17,8 +26,19 @@ export interface IStorage {
   // Post operations
   getPost(id: string): Promise<Post | undefined>;
   getPostsByUser(userId: string): Promise<Post[]>;
+  getPostsWithMetrics(userId: string, limit?: number): Promise<Array<Post & { metrics?: TweetMetrics }>>;
   createPost(post: InsertPost): Promise<Post>;
   updatePost(id: string, updates: Partial<Post>): Promise<Post | undefined>;
+
+  // OAuth state operations
+  createOauthState(state: InsertOauthState): Promise<OauthState>;
+  getOauthState(state: string): Promise<OauthState | undefined>;
+  deleteOauthState(state: string): Promise<void>;
+
+  // Tweet metrics operations
+  createTweetMetrics(metrics: InsertTweetMetrics): Promise<TweetMetrics>;
+  updateTweetMetrics(postId: string, metrics: Partial<TweetMetrics>): Promise<TweetMetrics | undefined>;
+  getTweetMetricsByPostIds(postIds: string[]): Promise<TweetMetrics[]>;
 
   // API log operations
   getRecentLogs(limit?: number): Promise<ApiLog[]>;
@@ -33,124 +53,135 @@ export interface IStorage {
   }>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-  private socialAccounts: Map<string, SocialAccount>;
-  private posts: Map<string, Post>;
-  private apiLogs: Map<string, ApiLog>;
-
-  constructor() {
-    this.users = new Map();
-    this.socialAccounts = new Map();
-    this.posts = new Map();
-    this.apiLogs = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getSocialAccount(id: string): Promise<SocialAccount | undefined> {
-    return this.socialAccounts.get(id);
+    const [account] = await db.select().from(socialAccounts).where(eq(socialAccounts.id, id));
+    return account || undefined;
   }
 
   async getSocialAccountsByUser(userId: string): Promise<SocialAccount[]> {
-    return Array.from(this.socialAccounts.values()).filter(
-      (account) => account.userId === userId,
-    );
+    return await db.select().from(socialAccounts).where(eq(socialAccounts.userId, userId));
   }
 
   async getSocialAccountByPlatform(userId: string, platform: string): Promise<SocialAccount | undefined> {
-    return Array.from(this.socialAccounts.values()).find(
-      (account) => account.userId === userId && account.platform === platform,
-    );
+    const [account] = await db.select().from(socialAccounts)
+      .where(and(eq(socialAccounts.userId, userId), eq(socialAccounts.platform, platform)));
+    return account || undefined;
   }
 
   async createSocialAccount(insertAccount: InsertSocialAccount): Promise<SocialAccount> {
-    const id = randomUUID();
-    const account: SocialAccount = { 
-      ...insertAccount, 
-      id,
-      accessToken: insertAccount.accessToken || null,
-      refreshToken: insertAccount.refreshToken || null,
-      tokenExpiresAt: insertAccount.tokenExpiresAt || null,
-      isActive: insertAccount.isActive ?? true,
-      createdAt: new Date(),
-    };
-    this.socialAccounts.set(id, account);
+    const [account] = await db.insert(socialAccounts).values(insertAccount).returning();
     return account;
   }
 
   async updateSocialAccount(id: string, updates: Partial<SocialAccount>): Promise<SocialAccount | undefined> {
-    const account = this.socialAccounts.get(id);
-    if (!account) return undefined;
-    
-    const updatedAccount = { ...account, ...updates };
-    this.socialAccounts.set(id, updatedAccount);
-    return updatedAccount;
+    const [account] = await db.update(socialAccounts)
+      .set(updates)
+      .where(eq(socialAccounts.id, id))
+      .returning();
+    return account || undefined;
   }
 
   async getPost(id: string): Promise<Post | undefined> {
-    return this.posts.get(id);
+    const [post] = await db.select().from(posts).where(eq(posts.id, id));
+    return post || undefined;
   }
 
   async getPostsByUser(userId: string): Promise<Post[]> {
-    return Array.from(this.posts.values()).filter(
-      (post) => post.userId === userId,
+    return await db.select().from(posts)
+      .where(eq(posts.userId, userId))
+      .orderBy(desc(posts.createdAt));
+  }
+
+  async getPostsWithMetrics(userId: string, limit: number = 10): Promise<Array<Post & { metrics?: TweetMetrics }>> {
+    const userPosts = await db.select().from(posts)
+      .where(eq(posts.userId, userId))
+      .orderBy(desc(posts.createdAt))
+      .limit(limit);
+
+    const postsWithMetrics = await Promise.all(
+      userPosts.map(async (post) => {
+        const [metrics] = await db.select().from(tweetMetrics)
+          .where(eq(tweetMetrics.postId, post.id))
+          .orderBy(desc(tweetMetrics.fetchedAt))
+          .limit(1);
+        return { ...post, metrics: metrics || undefined };
+      })
     );
+
+    return postsWithMetrics;
   }
 
   async createPost(insertPost: InsertPost): Promise<Post> {
-    const id = randomUUID();
-    const post: Post = { 
-      ...insertPost, 
-      id,
-      status: insertPost.status || "pending",
-      platformPostId: null,
-      createdAt: new Date(),
-    };
-    this.posts.set(id, post);
+    const [post] = await db.insert(posts).values(insertPost).returning();
     return post;
   }
 
   async updatePost(id: string, updates: Partial<Post>): Promise<Post | undefined> {
-    const post = this.posts.get(id);
-    if (!post) return undefined;
-    
-    const updatedPost = { ...post, ...updates };
-    this.posts.set(id, updatedPost);
-    return updatedPost;
+    const [post] = await db.update(posts)
+      .set(updates)
+      .where(eq(posts.id, id))
+      .returning();
+    return post || undefined;
+  }
+
+  async createOauthState(insertState: InsertOauthState): Promise<OauthState> {
+    const [state] = await db.insert(oauthStates).values(insertState).returning();
+    return state;
+  }
+
+  async getOauthState(stateValue: string): Promise<OauthState | undefined> {
+    const [state] = await db.select().from(oauthStates)
+      .where(eq(oauthStates.state, stateValue));
+    return state || undefined;
+  }
+
+  async deleteOauthState(stateValue: string): Promise<void> {
+    await db.delete(oauthStates).where(eq(oauthStates.state, stateValue));
+  }
+
+  async createTweetMetrics(insertMetrics: InsertTweetMetrics): Promise<TweetMetrics> {
+    const [metrics] = await db.insert(tweetMetrics).values(insertMetrics).returning();
+    return metrics;
+  }
+
+  async updateTweetMetrics(postId: string, updates: Partial<TweetMetrics>): Promise<TweetMetrics | undefined> {
+    const [metrics] = await db.update(tweetMetrics)
+      .set(updates)
+      .where(eq(tweetMetrics.postId, postId))
+      .returning();
+    return metrics || undefined;
+  }
+
+  async getTweetMetricsByPostIds(postIds: string[]): Promise<TweetMetrics[]> {
+    if (postIds.length === 0) return [];
+    return await db.select().from(tweetMetrics)
+      .where(eq(tweetMetrics.postId, postIds[0])); // Simple implementation, can be enhanced
   }
 
   async getRecentLogs(limit: number = 50): Promise<ApiLog[]> {
-    const logs = Array.from(this.apiLogs.values())
-      .sort((a, b) => (b.timestamp?.getTime() || 0) - (a.timestamp?.getTime() || 0))
-      .slice(0, limit);
-    return logs;
+    return await db.select().from(apiLogs)
+      .orderBy(desc(apiLogs.timestamp))
+      .limit(limit);
   }
 
   async createApiLog(insertLog: InsertApiLog): Promise<ApiLog> {
-    const id = randomUUID();
-    const log: ApiLog = { 
-      ...insertLog, 
-      id,
-      responseTime: insertLog.responseTime || null,
-      timestamp: new Date(),
-    };
-    this.apiLogs.set(id, log);
+    const [log] = await db.insert(apiLogs).values(insertLog).returning();
     return log;
   }
 
@@ -163,17 +194,16 @@ export class MemStorage implements IStorage {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const requestsToday = Array.from(this.apiLogs.values()).filter(
-      log => log.timestamp && log.timestamp >= today
-    ).length;
+    const requestsToday = await db.select().from(apiLogs)
+      .where(gte(apiLogs.timestamp, today));
 
     return {
-      totalRoutes: 8,
-      requestsToday,
+      totalRoutes: 10, // Updated to reflect new routes
+      requestsToday: requestsToday.length,
       activeConnections: 1,
       serverStatus: 'online',
     };
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

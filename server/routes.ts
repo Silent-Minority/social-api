@@ -11,8 +11,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }));
 
   // API logging middleware
-  app.use(async (req, res, next) => {
-    const start = Date.now();
+  app.use(async (req, res, next) => {    const start = Date.now();
     
     res.on('finish', async () => {
       const responseTime = Date.now() - start;
