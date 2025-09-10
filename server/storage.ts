@@ -84,6 +84,10 @@ export class MemStorage implements IStorage {
     const account: SocialAccount = { 
       ...insertAccount, 
       id,
+      accessToken: insertAccount.accessToken || null,
+      refreshToken: insertAccount.refreshToken || null,
+      tokenExpiresAt: insertAccount.tokenExpiresAt || null,
+      isActive: insertAccount.isActive ?? true,
       createdAt: new Date(),
     };
     this.socialAccounts.set(id, account);
@@ -114,6 +118,8 @@ export class MemStorage implements IStorage {
     const post: Post = { 
       ...insertPost, 
       id,
+      status: insertPost.status || "pending",
+      platformPostId: null,
       createdAt: new Date(),
     };
     this.posts.set(id, post);
@@ -141,6 +147,7 @@ export class MemStorage implements IStorage {
     const log: ApiLog = { 
       ...insertLog, 
       id,
+      responseTime: insertLog.responseTime || null,
       timestamp: new Date(),
     };
     this.apiLogs.set(id, log);

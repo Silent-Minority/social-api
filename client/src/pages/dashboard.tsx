@@ -7,11 +7,12 @@ import { QuickActions } from "@/components/quick-actions";
 import { RefreshCw, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { ServerStatus } from "@shared/schema";
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
 
-  const { data: status, isLoading } = useQuery({
+  const { data: status, isLoading } = useQuery<ServerStatus>({
     queryKey: ["/api/status"],
     refetchInterval: 30000, // Refresh every 30 seconds
   });

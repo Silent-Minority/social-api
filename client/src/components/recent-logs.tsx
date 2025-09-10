@@ -1,9 +1,10 @@
 import { FileText, Download, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import type { ApiLog } from "@shared/schema";
 
 export function RecentLogs() {
-  const { data: logs, isLoading } = useQuery({
+  const { data: logs, isLoading } = useQuery<ApiLog[]>({
     queryKey: ["/api/logs"],
     refetchInterval: 10000, // Refresh every 10 seconds
   });

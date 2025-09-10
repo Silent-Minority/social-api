@@ -1,8 +1,9 @@
 import { Settings, Database, Key, Lock, Globe, Shield, AlertTriangle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import type { ServerConfig } from "@shared/schema";
 
 export function EnvironmentConfig() {
-  const { data: config, isLoading } = useQuery({
+  const { data: config, isLoading } = useQuery<ServerConfig>({
     queryKey: ["/api/config"],
   });
 

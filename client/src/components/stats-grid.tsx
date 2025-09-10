@@ -1,13 +1,14 @@
 import { CheckCircle, Route, TrendingUp, Twitter } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import type { ServerConfig, ServerStatus } from "@shared/schema";
 
 interface StatsGridProps {
-  status?: any;
+  status?: ServerStatus;
   isLoading: boolean;
 }
 
 export function StatsGrid({ status, isLoading }: StatsGridProps) {
-  const { data: config } = useQuery({
+  const { data: config } = useQuery<ServerConfig>({
     queryKey: ["/api/config"],
   });
 

@@ -69,3 +69,22 @@ export type InsertPost = z.infer<typeof insertPostSchema>;
 export type Post = typeof posts.$inferSelect;
 export type InsertApiLog = z.infer<typeof insertApiLogSchema>;
 export type ApiLog = typeof apiLogs.$inferSelect;
+
+// API Response Types
+export interface ServerConfig {
+  port: string;
+  corsOrigin: string;
+  xApiKey: boolean;
+  xApiSecret: boolean;
+  jwtSecret: string;
+}
+
+export interface ServerStatus {
+  server: string;
+  port: string;
+  environment: string;
+  totalRoutes: number;
+  requestsToday: number;
+  activeConnections: number;
+  serverStatus: string;
+}
