@@ -273,20 +273,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/post", async (req, res) => {
     try {
       const { content, platform } = req.body;
-      const userId = DEMO_USER_ID; // In production, get from authenticated session
+      
+      // For demo, find the most recently connected user account
+      // In production, get userId from authenticated session
       
       if (!content || !platform) {
         return res.status(400).json({ error: "Missing required fields: content, platform" });
       }
 
-      // Verify user has connected account for this platform
-      let socialAccount = await storage.getSocialAccountByPlatform(userId, platform);
-      if (!socialAccount || !socialAccount.accessToken) {
+      // Find the most recent active social account for this platform
+      const allAccounts = await storage.getSocialAccounts();
+      const platformAccounts = allAccounts.filter((acc: any) => 
+        acc.platform === platform && 
+        acc.isActive && 
+        acc.accessToken
+      );
+      
+      if (platformAccounts.length === 0) {
         return res.status(400).json({ 
-          error: `No connected ${platform} account found for user`,
+          error: `No connected ${platform} account found`,
           suggestion: `Please connect your ${platform} account first via /auth/${platform}/start`
         });
       }
+      
+      // Use the most recently connected account
+      let socialAccount = platformAccounts.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
 
       // Check if token is expired and needs refresh
       if (socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= new Date()) {
@@ -413,16 +426,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Batch metrics job - fetch tweet analytics
   app.post("/api/metrics/fetch", async (req, res) => {
     try {
-      const userId = DEMO_USER_ID; // In production, get from authenticated session
-
-      // Get user's X account (same demo logic as posting)
-      let socialAccount = await storage.getSocialAccountByPlatform(userId, "x");
-      if (!socialAccount || !socialAccount.accessToken) {
+      // Find the most recent active X account
+      // In production, get from authenticated session
+      const allAccounts = await storage.getSocialAccounts();
+      const xAccounts = allAccounts.filter((acc: any) => 
+        acc.platform === "x" && 
+        acc.isActive && 
+        acc.accessToken
+      );
+      
+      if (xAccounts.length === 0) {
         return res.status(400).json({ 
-          error: "No connected X account found for user",
+          error: "No connected X account found",
           suggestion: "Please connect your X account first via /auth/x/start"
         });
       }
+      
+      // Use the most recently connected X account
+      let socialAccount = xAccounts.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
 
       // Check token expiration for metrics fetching and refresh if needed
       if (socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= new Date()) {
@@ -472,8 +495,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Get recent posts that have tweet IDs but no recent metrics
-      const posts = await storage.getPostsByUser(userId);
+      // Get recent posts that have tweet IDs but no recent metrics - use the same user as the social account
+      const posts = await storage.getPostsByUser(socialAccount.userId);
       const postsWithTweetIds = posts.filter(post => 
         post.platform === "x" && 
         post.status === "posted" && 
