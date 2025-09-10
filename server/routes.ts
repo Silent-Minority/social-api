@@ -106,8 +106,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const config = {
       port: process.env.PORT || 5000,
       corsOrigin: process.env.CORS_ORIGIN || "*",
-      xApiKey: !!process.env.X_API_KEY,
-      xApiSecret: !!process.env.X_API_SECRET,
+      xClientId: !!process.env.X_CLIENT_ID,
+      xClientSecret: !!process.env.X_CLIENT_SECRET,
       jwtSecret: process.env.JWT_SECRET ? "configured" : "default",
     };
     res.json(config);
@@ -129,7 +129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Start OAuth flow - redirect to X authorization page
   app.get("/auth/x/start", async (req, res) => {
     try {
-      const { X_API_KEY: clientId, X_API_SECRET: clientSecret } = process.env;
+      const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
       
       if (!clientId || !clientSecret) {
         return res.status(500).json({ 
@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid or expired OAuth state" });
       }
 
-      const { X_API_KEY: clientId, X_API_SECRET: clientSecret } = process.env;
+      const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
       const { TwitterOAuth, calculateTokenExpiration } = await import("./oauth");
       
       // Exchange code for tokens
@@ -282,56 +282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Verify user has connected account for this platform
       let socialAccount = await storage.getSocialAccountByPlatform(userId, platform);
       if (!socialAccount || !socialAccount.accessToken) {
-        // For demo purposes, create a mock connected account if API keys are available
-        console.log("Checking for X API credentials...", {
-          hasApiKey: !!process.env.X_API_KEY,
-          hasAccessToken: !!process.env.X_ACCESS_TOKEN,
-          platform
+        return res.status(400).json({ 
+          error: `No connected ${platform} account found for user`,
+          suggestion: `Please connect your ${platform} account first via /auth/${platform}/start`
         });
-        
-        if (platform === "x" && process.env.X_API_KEY && process.env.X_ACCESS_TOKEN) {
-          try {
-            // Ensure demo user exists (check by ID first, then by username)
-            let demoUser = await storage.getUser(DEMO_USER_ID);
-            if (!demoUser) {
-              demoUser = await storage.getUserByUsername("demo_user");
-            }
-            if (!demoUser) {
-              demoUser = await storage.createUser({
-                username: "demo_user",
-                password: "demo_password" // Demo password
-              });
-              console.log("Created demo user with ID:", demoUser.id);
-            }
-
-            // Create mock social account using environment variables
-            console.log("Creating social account for user ID:", demoUser.id, "vs DEMO_USER_ID:", DEMO_USER_ID);
-            socialAccount = await storage.createSocialAccount({
-              userId: demoUser.id,
-              platform: "x",
-              accountId: "demo_x_account",
-              accountUsername: "demo_x_user",
-              accessToken: process.env.X_ACCESS_TOKEN!,
-              refreshToken: process.env.X_ACCESS_TOKEN_SECRET || null,
-              tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
-              scope: "tweet.read tweet.write users.read offline.access",
-              isActive: true,
-            });
-
-            console.log("Created demo X account for testing");
-          } catch (demoSetupError: any) {
-            console.error("Failed to create demo account:", demoSetupError);
-            return res.status(500).json({ 
-              error: "Failed to set up demo account",
-              suggestion: "Please complete OAuth flow via /auth/x/start"
-            });
-          }
-        } else {
-          return res.status(400).json({ 
-            error: `No connected ${platform} account found for user`,
-            suggestion: `Please connect your ${platform} account first via /auth/${platform}/start`
-          });
-        }
       }
 
       // Check if token is expired and needs refresh
@@ -343,12 +297,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
         
-        // TODO: Implement token refresh logic here
-        console.warn("Token expired, refresh logic not yet implemented");
-        return res.status(401).json({
-          error: "Access token expired",
-          suggestion: "Please re-authenticate your account (token refresh not implemented)"
-        });
+        // Refresh the access token
+        const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
+        if (!clientId || !clientSecret) {
+          return res.status(500).json({ error: "OAuth 2.0 credentials not configured" });
+        }
+        
+        try {
+          const { TwitterOAuth, calculateTokenExpiration } = await import("./oauth");
+          const refreshedTokens = await TwitterOAuth.refreshAccessToken(
+            socialAccount.refreshToken,
+            clientId,
+            clientSecret
+          );
+          
+          // Update the social account with new tokens
+          const newExpiresAt = calculateTokenExpiration(refreshedTokens.expires_in);
+          await storage.updateSocialAccount(socialAccount.id, {
+            accessToken: refreshedTokens.access_token,
+            refreshToken: refreshedTokens.refresh_token || socialAccount.refreshToken,
+            tokenExpiresAt: newExpiresAt,
+            scope: refreshedTokens.scope
+          });
+          
+          // Update the local socialAccount object for this request
+          socialAccount.accessToken = refreshedTokens.access_token;
+          socialAccount.refreshToken = refreshedTokens.refresh_token || socialAccount.refreshToken;
+          socialAccount.tokenExpiresAt = newExpiresAt;
+          
+          console.log("Successfully refreshed access token for user:", socialAccount.userId);
+        } catch (refreshError: any) {
+          console.error("Token refresh failed:", refreshError);
+          return res.status(401).json({
+            error: "Failed to refresh access token",
+            suggestion: "Please re-authenticate your account",
+            details: refreshError?.message
+          });
+        }
       }
 
       // Create post record with pending status - use the actual user ID from social account
@@ -363,7 +348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (platform === "x") {
           const { TwitterOAuth } = await import("./oauth");
           
-          // Post tweet
+          // Post tweet - accessToken is guaranteed to exist at this point
+          if (!socialAccount.accessToken) {
+            throw new Error("Access token not available");
+          }
           const tweetData = await TwitterOAuth.postTweet(socialAccount.accessToken, content);
           
           // Update post with success status and tweet ID
@@ -430,59 +418,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get user's X account (same demo logic as posting)
       let socialAccount = await storage.getSocialAccountByPlatform(userId, "x");
       if (!socialAccount || !socialAccount.accessToken) {
-        // For demo purposes, create a mock connected account if API keys are available  
-        console.log("Checking metrics X API credentials...", {
-          hasApiKey: !!process.env.X_API_KEY,
-          hasAccessToken: !!process.env.X_ACCESS_TOKEN
+        return res.status(400).json({ 
+          error: "No connected X account found for user",
+          suggestion: "Please connect your X account first via /auth/x/start"
         });
-        
-        if (process.env.X_API_KEY && process.env.X_ACCESS_TOKEN) {
-          try {
-            // Ensure demo user exists (check by ID first, then by username) 
-            let demoUser = await storage.getUser(DEMO_USER_ID);
-            if (!demoUser) {
-              demoUser = await storage.getUserByUsername("demo_user");
-            }
-            if (!demoUser) {
-              demoUser = await storage.createUser({
-                username: "demo_user", 
-                password: "demo_password"
-              });
-              console.log("Created demo user for metrics with ID:", demoUser.id);
-            }
-
-            // Create mock social account
-            socialAccount = await storage.createSocialAccount({
-              userId: demoUser.id,
-              platform: "x",
-              accountId: "demo_x_account",
-              accountUsername: "demo_x_user", 
-              accessToken: process.env.X_ACCESS_TOKEN!,
-              refreshToken: process.env.X_ACCESS_TOKEN_SECRET || null,
-              tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-              scope: "tweet.read tweet.write users.read offline.access",
-              isActive: true,
-            });
-
-            console.log("Created demo X account for metrics");
-          } catch (error: any) {
-            return res.status(500).json({ 
-              error: "Failed to set up demo account for metrics"
-            });
-          }
-        } else {
-          return res.status(400).json({ 
-            error: "No connected X account found for user"
-          });
-        }
       }
 
-      // Check token expiration for metrics fetching too
+      // Check token expiration for metrics fetching and refresh if needed
       if (socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= new Date()) {
-        return res.status(401).json({
-          error: "Access token expired",
-          suggestion: "Please re-authenticate your X account"
-        });
+        if (!socialAccount.refreshToken) {
+          return res.status(401).json({
+            error: "Access token expired and no refresh token available",
+            suggestion: "Please re-authenticate your X account"
+          });
+        }
+        
+        // Refresh the access token
+        const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
+        if (!clientId || !clientSecret) {
+          return res.status(500).json({ error: "OAuth 2.0 credentials not configured" });
+        }
+        
+        try {
+          const { TwitterOAuth, calculateTokenExpiration } = await import("./oauth");
+          const refreshedTokens = await TwitterOAuth.refreshAccessToken(
+            socialAccount.refreshToken,
+            clientId,
+            clientSecret
+          );
+          
+          // Update the social account with new tokens
+          const newExpiresAt = calculateTokenExpiration(refreshedTokens.expires_in);
+          await storage.updateSocialAccount(socialAccount.id, {
+            accessToken: refreshedTokens.access_token,
+            refreshToken: refreshedTokens.refresh_token || socialAccount.refreshToken,
+            tokenExpiresAt: newExpiresAt,
+            scope: refreshedTokens.scope
+          });
+          
+          // Update the local socialAccount object for this request
+          socialAccount.accessToken = refreshedTokens.access_token;
+          socialAccount.refreshToken = refreshedTokens.refresh_token || socialAccount.refreshToken;
+          socialAccount.tokenExpiresAt = newExpiresAt;
+          
+          console.log("Successfully refreshed access token for metrics:", socialAccount.userId);
+        } catch (refreshError: any) {
+          console.error("Metrics token refresh failed:", refreshError);
+          return res.status(401).json({
+            error: "Failed to refresh access token for metrics",
+            suggestion: "Please re-authenticate your X account",
+            details: refreshError?.message
+          });
+        }
       }
 
       // Get recent posts that have tweet IDs but no recent metrics
@@ -504,7 +491,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tweetIds = postsWithTweetIds.map(post => post.platformPostId!);
       
       try {
-        // Fetch metrics from X API
+        // Fetch metrics from X API - accessToken is guaranteed to exist at this point
+        if (!socialAccount.accessToken) {
+          throw new Error("Access token not available for metrics fetch");
+        }
         const metricsData = await TwitterOAuth.fetchTweetMetrics(
           socialAccount.accessToken,
           tweetIds

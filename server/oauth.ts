@@ -81,36 +81,15 @@ export class TwitterOAuth {
     return response.json();
   }
 
-  // Post a tweet using OAuth 1.0a (required for posting tweets)
+  // Post a tweet using OAuth 2.0 Bearer token
   static async postTweet(accessToken: string, content: string): Promise<{
     id: string;
     text: string;
   }> {
-    // For posting tweets, we need OAuth 1.0a authentication
-    // The accessToken stored is actually the OAuth 1.0a access token
-    // We need to use OAuth 1.0a signing instead of Bearer token
-    
-    const { X_API_KEY: consumerKey, X_API_SECRET: consumerSecret } = process.env;
-    const { X_ACCESS_TOKEN: oauthToken, X_ACCESS_TOKEN_SECRET: oauthTokenSecret } = process.env;
-    
-    if (!consumerKey || !consumerSecret || !oauthToken || !oauthTokenSecret) {
-      throw new Error("Missing OAuth 1.0a credentials for posting tweets");
-    }
-
-    // Generate OAuth 1.0a authorization header
-    const oauth = TwitterOAuth.generateOAuth1aHeader(
-      'POST',
-      `${TwitterOAuth.TWITTER_API_BASE}/2/tweets`,
-      consumerKey,
-      consumerSecret,
-      oauthToken,
-      oauthTokenSecret
-    );
-
     const response = await fetch(`${TwitterOAuth.TWITTER_API_BASE}/2/tweets`, {
       method: 'POST',
       headers: {
-        'Authorization': oauth,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ text: content }),
@@ -125,52 +104,38 @@ export class TwitterOAuth {
     return data.data;
   }
 
-  // Generate OAuth 1.0a authorization header
-  static generateOAuth1aHeader(
-    method: string,
-    url: string,
-    consumerKey: string,
-    consumerSecret: string,
-    accessToken: string,
-    accessTokenSecret: string
-  ): string {
-    const oauthNonce = crypto.randomBytes(16).toString('hex');
-    const oauthTimestamp = Math.floor(Date.now() / 1000).toString();
-    
-    const params: Record<string, string> = {
-      oauth_consumer_key: consumerKey,
-      oauth_nonce: oauthNonce,
-      oauth_signature_method: 'HMAC-SHA1',
-      oauth_timestamp: oauthTimestamp,
-      oauth_token: accessToken,
-      oauth_version: '1.0',
-    };
+  // Refresh an expired access token using the refresh token
+  static async refreshAccessToken(
+    refreshToken: string,
+    clientId: string,
+    clientSecret: string
+  ): Promise<{
+    access_token: string;
+    refresh_token?: string;
+    expires_in: number;
+    scope: string;
+  }> {
+    const params = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+    });
 
-    // Create signature base string
-    const paramString = Object.keys(params)
-      .sort()
-      .map(key => `${key}=${encodeURIComponent(params[key])}`)
-      .join('&');
-    
-    const signatureBaseString = `${method}&${encodeURIComponent(url)}&${encodeURIComponent(paramString)}`;
-    
-    // Create signing key
-    const signingKey = `${encodeURIComponent(consumerSecret)}&${encodeURIComponent(accessTokenSecret)}`;
-    
-    // Generate signature
-    const signature = crypto.createHmac('sha1', signingKey)
-      .update(signatureBaseString)
-      .digest('base64');
-    
-    params.oauth_signature = signature;
+    const response = await fetch(TwitterOAuth.TWITTER_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params.toString(),
+    });
 
-    // Build authorization header
-    const authHeader = 'OAuth ' + Object.keys(params)
-      .sort()
-      .map(key => `${key}="${encodeURIComponent(params[key])}"`)
-      .join(', ');
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Token refresh failed: ${error}`);
+    }
 
-    return authHeader;
+    return response.json();
   }
 
   // Fetch tweet metrics
