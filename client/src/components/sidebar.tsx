@@ -7,7 +7,7 @@ export function Sidebar() {
   const navItems = [
     { icon: BarChart3, label: "Dashboard", href: "/", active: location === "/" || location === "/dashboard" },
     { icon: Route, label: "API Routes", href: "/routes", active: location === "/routes" },
-    { icon: Key, label: "Authentication", href: "/auth", active: location === "/auth" },
+    { icon: Key, label: "Authentication", href: "/authentication", active: location === "/authentication" },
     { icon: Settings, label: "Configuration", href: "/config", active: location === "/config" },
     { icon: FileText, label: "Logs", href: "/logs", active: location === "/logs" },
     { icon: TestTube, label: "API Testing", href: "/testing", active: location === "/testing" },
