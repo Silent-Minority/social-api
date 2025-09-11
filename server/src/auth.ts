@@ -15,7 +15,7 @@ router.get('/auth/x/start', (req, res) => {
     }
 
     const { codeChallenge, state } = generatePKCE();
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/x/callback`;
+    const redirectUri = 'https://api.mirancourt.com/auth/x/callback';
     
     const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge);
     
@@ -47,7 +47,7 @@ router.get('/auth/x/callback', async (req, res) => {
 
     const clientId = process.env.X_CLIENT_ID!;
     const clientSecret = process.env.X_CLIENT_SECRET!;
-    const redirectUri = `${req.protocol}://${req.get('host')}/auth/x/callback`;
+    const redirectUri = 'https://api.mirancourt.com/auth/x/callback';
     
     // Exchange code for tokens
     const tokenData = await exchangeCodeForTokens(
