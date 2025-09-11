@@ -126,6 +126,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // X (Twitter) OAuth 2.0 PKCE Flow Implementation
   
+  // Redirect for legacy/friendly URL
+  app.get("/auth/twitter", (req, res) => {
+    res.redirect("/auth/x/start");
+  });
+  
   // Start OAuth flow - redirect to X authorization page
   app.get("/auth/x/start", async (req, res) => {
     try {
