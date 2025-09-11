@@ -66,6 +66,17 @@ export const apiLogs = pgTable("api_logs", {
   timestamp: timestamp("timestamp").default(sql`now()`),
 });
 
+export const twitterTokens = pgTable("twitter_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at"),
+  scope: text("scope"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -97,6 +108,12 @@ export const insertOauthStateSchema = createInsertSchema(oauthStates).omit({
   createdAt: true,
 });
 
+export const insertTwitterTokensSchema = createInsertSchema(twitterTokens).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertSocialAccount = z.infer<typeof insertSocialAccountSchema>;
@@ -109,6 +126,8 @@ export type InsertTweetMetrics = z.infer<typeof insertTweetMetricsSchema>;
 export type TweetMetrics = typeof tweetMetrics.$inferSelect;
 export type InsertOauthState = z.infer<typeof insertOauthStateSchema>;
 export type OauthState = typeof oauthStates.$inferSelect;
+export type InsertTwitterTokens = z.infer<typeof insertTwitterTokensSchema>;
+export type TwitterTokens = typeof twitterTokens.$inferSelect;
 
 // API Response Types
 export interface ServerConfig {
