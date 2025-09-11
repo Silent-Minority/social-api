@@ -36,6 +36,13 @@ export function generatePKCE(): { codeVerifier: string; codeChallenge: string; s
 // Retrieve and remove PKCE code verifier
 export function retrieveCodeVerifier(state: string): string | null {
   const data = pkceStore.get(state);
+  console.log('🗂️  PKCE Store lookup:', { 
+    state, 
+    found: !!data, 
+    storeSize: pkceStore.size,
+    allStates: Array.from(pkceStore.keys())
+  });
+  
   if (!data) return null;
   
   pkceStore.delete(state);

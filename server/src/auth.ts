@@ -19,6 +19,8 @@ router.get('/auth/x/start', (req, res) => {
     
     const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge);
     
+    console.log('🚀 OAuth start - State generated:', state);
+    
     // Direct redirect to Twitter
     res.redirect(authUrl);
   } catch (error) {
@@ -32,6 +34,8 @@ router.get('/auth/x/callback', async (req, res) => {
   try {
     const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
     
+    console.log('📞 OAuth callback received:', { code: !!code, state, error });
+    
     if (error) {
       return res.status(400).send(`OAuth error: ${error}`);
     }
@@ -41,8 +45,16 @@ router.get('/auth/x/callback', async (req, res) => {
     }
 
     const codeVerifier = retrieveCodeVerifier(state);
+    console.log('🔑 Code verifier retrieval:', { state, found: !!codeVerifier });
+    
     if (!codeVerifier) {
-      return res.status(400).send('Invalid or expired state parameter');
+      return res.status(400).json({ 
+        error: "Invalid or expired OAuth state",
+        debug: {
+          received_state: state,
+          timestamp: new Date().toISOString()
+        }
+      });
     }
 
     const clientId = process.env.X_CLIENT_ID!;
