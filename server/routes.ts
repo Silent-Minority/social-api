@@ -566,6 +566,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all social accounts (for authentication page)
+  app.get("/api/social-accounts", async (req, res) => {
+    try {
+      // For demo purposes, get all accounts from all users
+      // In production, filter by authenticated user
+      const accounts = await storage.getSocialAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error("Error fetching social accounts:", error);
+      res.status(500).json({ error: "Failed to get social accounts" });
+    }
+  });
+
+  // Get auth status
+  app.get("/api/auth/status", async (req, res) => {
+    try {
+      // For demo purposes, return basic auth status
+      // In production, return actual user authentication status
+      res.json({ 
+        authenticated: false, // Change to true when user is logged in
+        user: null 
+      });
+    } catch (error) {
+      console.error("Error getting auth status:", error);
+      res.status(500).json({ error: "Failed to get auth status" });
+    }
+  });
+
   // Get user's connected accounts
   app.get("/api/accounts/:userId", async (req, res) => {
     try {

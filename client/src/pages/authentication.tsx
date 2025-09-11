@@ -69,7 +69,7 @@ export default function Authentication() {
     return <Badge variant="default" data-testid="status-connected"><CheckCircle className="w-3 h-3 mr-1" />Connected</Badge>;
   };
 
-  const twitterAccount = accounts?.find(acc => acc.platform === 'twitter');
+  const twitterAccount = accounts?.find(acc => acc.platform === 'x');
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">

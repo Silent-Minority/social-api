@@ -28,8 +28,8 @@ export function Sidebar() {
       <nav className="px-4 space-y-2">
         {navItems.map((item) => (
           <Link key={item.href} href={item.href}>
-            <a
-              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${
+            <div
+              className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer ${
                 item.active
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-accent/10"
@@ -38,7 +38,7 @@ export function Sidebar() {
             >
               <item.icon className="w-4 h-4" />
               <span>{item.label}</span>
-            </a>
+            </div>
           </Link>
         ))}
       </nav>
