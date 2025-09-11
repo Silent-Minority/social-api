@@ -35,8 +35,10 @@ Preferred communication style: Simple, everyday language.
 - **Development Storage**: In-memory storage implementation for testing and development
 
 ## Authentication and Authorization
-- **Social OAuth**: Multi-platform OAuth integration for X/Twitter, Facebook, and Instagram
-- **Token Management**: Secure storage of access tokens, refresh tokens, and expiration tracking
+- **OAuth 2.0 PKCE Flow**: Simplified OAuth 2.0 implementation with PKCE (Proof Key for Code Exchange) for secure authentication
+- **Direct Redirects**: Clean user experience with direct redirects to Twitter authorization instead of JSON responses
+- **Token Management**: Secure storage of access tokens, refresh tokens, and expiration tracking via storage interface
+- **In-Memory State**: PKCE code verifiers stored temporarily in memory with automatic cleanup
 - **Session Handling**: Express session management with PostgreSQL session store
 - **CORS Configuration**: Configurable CORS settings for cross-origin requests
 
