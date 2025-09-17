@@ -27,7 +27,7 @@ export function Sidebar() {
       
       <nav className="px-4 space-y-2">
         {navItems.map((item) => (
-          <Link key={item.href} href={item.href}>
+          <Link key={item.label} href={item.href}>
             <div
               className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors cursor-pointer ${
                 item.active
