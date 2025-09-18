@@ -1,7 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import authRouter from "./src/auth";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
@@ -42,6 +47,15 @@ app.use((req, res, next) => {
   
   // Mount the new simplified OAuth routes
   app.use(authRouter);
+
+  // Serve static legal pages
+  app.get('/privacy-policy.html', (_req: Request, res: Response) => {
+    res.sendFile('privacy-policy.html', { root: __dirname });
+  });
+
+  app.get('/terms-of-service.html', (_req: Request, res: Response) => {
+    res.sendFile('terms-of-service.html', { root: __dirname });
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
