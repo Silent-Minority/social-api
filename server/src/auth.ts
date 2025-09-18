@@ -14,12 +14,18 @@ router.get('/auth/x/start', (req, res) => {
       return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in Replit Secrets.');
     }
 
+    const redirectUri = process.env.X_REDIRECT_URI;
+    const scopes = process.env.X_SCOPES;
+    
+    if (!redirectUri || !scopes) {
+      return res.status(500).send('OAuth configuration not complete. Please set X_REDIRECT_URI and X_SCOPES in Replit Secrets.');
+    }
+
     const { codeChallenge, state } = generatePKCE();
-    const redirectUri = 'https://api.mirancourt.com/auth/x/callback';
     
-    const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge);
+    const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge, scopes);
     
-    console.log('🚀 OAuth start - State generated:', state);
+    console.log('🚀 OAuth start - Authorization flow initiated');
     
     // Direct redirect to Twitter
     res.redirect(authUrl);
@@ -59,7 +65,7 @@ router.get('/auth/x/callback', async (req, res) => {
 
     const clientId = process.env.X_CLIENT_ID!;
     const clientSecret = process.env.X_CLIENT_SECRET!;
-    const redirectUri = 'https://api.mirancourt.com/auth/x/callback';
+    const redirectUri = process.env.X_REDIRECT_URI!;
     
     // Exchange code for tokens
     const tokenData = await exchangeCodeForTokens(

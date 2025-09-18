@@ -37,10 +37,8 @@ export function generatePKCE(): { codeVerifier: string; codeChallenge: string; s
 export function retrieveCodeVerifier(state: string): string | null {
   const data = pkceStore.get(state);
   console.log('🗂️  PKCE Store lookup:', { 
-    state, 
     found: !!data, 
-    storeSize: pkceStore.size,
-    allStates: Array.from(pkceStore.keys())
+    storeSize: pkceStore.size
   });
   
   if (!data) return null;
@@ -54,14 +52,15 @@ export function buildAuthUrl(
   clientId: string,
   redirectUri: string,
   state: string,
-  codeChallenge: string
+  codeChallenge: string,
+  scopes?: string
 ): string {
-  const scopes = 'tweet.read tweet.write users.read offline.access';
+  const oauthScopes = scopes || 'tweet.read tweet.write users.read offline.access';
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: scopes,
+    scope: oauthScopes,
     state,
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
