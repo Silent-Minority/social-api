@@ -133,8 +133,8 @@ export type TwitterTokens = typeof twitterTokens.$inferSelect;
 export interface ServerConfig {
   port: string;
   corsOrigin: string;
-  xApiKey: boolean;
-  xApiSecret: boolean;
+  xClientId: boolean;
+  xClientSecret: boolean;
   jwtSecret: string;
 }
 

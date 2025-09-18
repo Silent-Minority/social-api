@@ -31,17 +31,17 @@ export function EnvironmentConfig() {
     },
     {
       icon: Key,
-      name: "X_API_KEY",
-      value: config?.xApiKey ? "••••••••" : "Missing",
-      status: config?.xApiKey ? "configured" : "missing",
-      color: config?.xApiKey ? "green" : "red"
+      name: "X_CLIENT_ID",
+      value: config?.xClientId ? "••••••••" : "Missing",
+      status: config?.xClientId ? "configured" : "missing",
+      color: config?.xClientId ? "green" : "red"
     },
     {
       icon: Lock,
-      name: "X_API_SECRET",
-      value: config?.xApiSecret ? "••••••••" : "Missing",
-      status: config?.xApiSecret ? "configured" : "missing",
-      color: config?.xApiSecret ? "green" : "red"
+      name: "X_CLIENT_SECRET",
+      value: config?.xClientSecret ? "••••••••" : "Missing",
+      status: config?.xClientSecret ? "configured" : "missing",
+      color: config?.xClientSecret ? "green" : "red"
     },
     {
       icon: Globe,
@@ -72,7 +72,7 @@ export function EnvironmentConfig() {
     }
   };
 
-  const missingCredentials = !config?.xApiKey || !config?.xApiSecret;
+  const missingCredentials = !config?.xClientId || !config?.xClientSecret;
 
   return (
     <div className="bg-card rounded-lg border border-border">
@@ -110,7 +110,7 @@ export function EnvironmentConfig() {
               <div>
                 <p className="text-sm font-medium text-destructive">Configuration Required</p>
                 <p className="text-xs text-destructive/80 mt-1">
-                  X API credentials are missing. Configure them in your .env file to enable social posting.
+                  X OAuth 2.0 credentials are missing. Configure X_CLIENT_ID and X_CLIENT_SECRET in Replit Secrets to enable social posting.
                 </p>
               </div>
             </div>
