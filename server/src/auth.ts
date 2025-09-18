@@ -7,6 +7,20 @@ const router = express.Router();
 // Start OAuth flow - redirect to Twitter
 router.get('/auth/x/start', (req, res) => {
   try {
+    // Debug: Log what environment variables we're actually reading
+    console.log('🔍 OAuth 2.0 Environment Variables Check:');
+    console.log('X_CLIENT_ID:', process.env.X_CLIENT_ID ? '[SET]' : '[MISSING]');
+    console.log('X_CLIENT_SECRET:', process.env.X_CLIENT_SECRET ? '[SET]' : '[MISSING]');
+    console.log('X_REDIRECT_URI:', process.env.X_REDIRECT_URI || '[MISSING]');
+    console.log('X_SCOPES:', process.env.X_SCOPES || '[MISSING]');
+    
+    // Check for legacy OAuth 1.0a variables (should NOT be present)
+    console.log('🚫 Legacy OAuth 1.0a Variables (should be empty):');
+    console.log('X_API_KEY:', process.env.X_API_KEY ? '[FOUND - REMOVE THIS]' : '[NOT FOUND - GOOD]');
+    console.log('X_API_SECRET:', process.env.X_API_SECRET ? '[FOUND - REMOVE THIS]' : '[NOT FOUND - GOOD]');
+    console.log('X_ACCESS_TOKEN:', process.env.X_ACCESS_TOKEN ? '[FOUND - REMOVE THIS]' : '[NOT FOUND - GOOD]');
+    console.log('X_ACCESS_TOKEN_SECRET:', process.env.X_ACCESS_TOKEN_SECRET ? '[FOUND - REMOVE THIS]' : '[NOT FOUND - GOOD]');
+
     const clientId = process.env.X_CLIENT_ID;
     const clientSecret = process.env.X_CLIENT_SECRET;
     
