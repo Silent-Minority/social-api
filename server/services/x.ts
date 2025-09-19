@@ -2,11 +2,11 @@ import { storage } from "../storage.js";
 import { getValidAccessToken as getValidAccessTokenInternal } from "../src/token-refresh.js";
 
 /**
- * Resolves the most recent active X account
+ * Resolves the most recent active X account and valid access token
  * Note: Currently demo-only - picks global most recent account
  * TODO: Scope by authenticated user when auth is implemented
  */
-export async function resolveActiveXAccount() {
+export async function resolveAccountAndToken() {
   const allAccounts = await storage.getSocialAccounts();
   const xAccounts = allAccounts.filter((acc: any) => 
     acc.platform === "x" && 
@@ -23,26 +23,49 @@ export async function resolveActiveXAccount() {
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )[0];
 
+  // Get valid token with automatic refresh
+  const tokenResult = await getValidAccessTokenInternal(account.userId, "x");
+
   return {
     userId: account.userId,
     accountId: account.accountId, // X user ID from OAuth
-    accessToken: account.accessToken
+    accessToken: tokenResult.accessToken
   };
 }
 
 /**
- * Gets a valid X access token, refreshing if necessary
+ * Legacy function - use resolveAccountAndToken() instead
+ * @deprecated
+ */
+export async function resolveActiveXAccount() {
+  const result = await resolveAccountAndToken();
+  return result ? {
+    userId: result.userId,
+    accountId: result.accountId
+  } : null;
+}
+
+/**
+ * Legacy function - use resolveAccountAndToken() instead
+ * @deprecated
  */
 export async function getXAccessToken(): Promise<string> {
-  // Find the most recent active X account (same logic as resolveActiveXAccount)
-  const account = await resolveActiveXAccount();
-  if (!account) {
+  const result = await resolveAccountAndToken();
+  if (!result) {
     throw new Error("No connected X account found");
   }
+  return result.accessToken;
+}
 
-  // Get valid token with automatic refresh
-  const tokenResult = await getValidAccessTokenInternal(account.userId, "x");
-  return tokenResult.accessToken;
+/**
+ * Validates and clamps tweet count parameter
+ */
+export function validateTweetCount(count: string | undefined): number {
+  const parsed = parseInt(count || "5");
+  if (isNaN(parsed)) {
+    return 5; // Default if invalid
+  }
+  return Math.max(1, Math.min(parsed, 100)); // Clamp between 1-100
 }
 
 /**
@@ -64,7 +87,7 @@ export async function fetchUserTweets(
   } = options;
 
   const url = new URL(`https://api.x.com/2/users/${xUserId}/tweets`);
-  url.searchParams.set("max_results", String(Math.min(max_results, 100)));
+  url.searchParams.set("max_results", String(max_results));
   url.searchParams.set("tweet.fields", tweet_fields);
   
   if (pagination_token) {

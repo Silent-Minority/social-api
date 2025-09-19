@@ -527,30 +527,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get user's timeline (their own tweets)
-  app.get("/api/timeline", async (req, res, next) => {
+  // Shared timeline handler function
+  async function handleTimelineRequest(req: any, res: any, next: any) {
     try {
-      // Resolve the active X account
-      const account = await xService.resolveActiveXAccount();
-      if (!account) {
+      // Resolve account and get valid access token in one call
+      const accountResult = await xService.resolveAccountAndToken();
+      if (!accountResult) {
         return res.status(400).json({
           error: "No connected X account found",
           suggestion: "Connect via /auth/x/start"
         });
       }
 
-      // Get valid access token
-      const accessToken = await xService.getXAccessToken();
-
-      // Parse query parameters
-      const count = Math.min(parseInt(req.query.count as string) || 5, 100);
+      // Parse query parameters with proper validation
+      const count = xService.validateTweetCount(req.query.count as string);
       const paginationToken = req.query.pagination_token as string;
       const tweetFields = req.query.tweet_fields as string || "created_at,public_metrics";
 
       // Fetch user's tweets
       const { response, data } = await xService.fetchUserTweets(
-        accessToken,
-        account.accountId,
+        accountResult.accessToken,
+        accountResult.accountId,
         {
           max_results: count,
           pagination_token: paginationToken,
@@ -570,59 +567,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       return next(err);
     }
-  });
+  }
+
+  // Get user's timeline (their own tweets)
+  app.get("/api/timeline", handleTimelineRequest);
 
   // Get recent tweets (alias to /api/timeline for backward compatibility)
   // @deprecated Use /api/timeline instead
   app.get("/api/recent-tweets", async (req, res, next) => {
-    // Add deprecation header
+    // Add deprecation headers
     res.setHeader("Deprecation", "true");
     res.setHeader("Warning", '299 - "This endpoint is deprecated. Use /api/timeline instead."');
     
     // Log deprecation warning
     console.warn("📢 DEPRECATED: /api/recent-tweets endpoint used. Please migrate to /api/timeline");
     
-    try {
-      // Resolve the active X account
-      const account = await xService.resolveActiveXAccount();
-      if (!account) {
-        return res.status(400).json({
-          error: "No connected X account found",
-          suggestion: "Connect via /auth/x/start"
-        });
-      }
-
-      // Get valid access token
-      const accessToken = await xService.getXAccessToken();
-
-      // Parse query parameters (same as timeline)
-      const count = Math.min(parseInt(req.query.count as string) || 5, 100);
-      const paginationToken = req.query.pagination_token as string;
-      const tweetFields = req.query.tweet_fields as string || "created_at,public_metrics";
-
-      // Fetch user's tweets using service layer
-      const { response, data } = await xService.fetchUserTweets(
-        accessToken,
-        account.accountId,
-        {
-          max_results: count,
-          pagination_token: paginationToken,
-          tweet_fields: tweetFields
-        }
-      );
-
-      if (!response.ok) {
-        return res.status(502).json({
-          error: "X API error",
-          status: response.status,
-          details: data
-        });
-      }
-
-      return res.json(data);
-    } catch (err) {
-      return next(err);
-    }
+    // Delegate to shared handler (eliminates duplication)
+    return handleTimelineRequest(req, res, next);
   });
 
   // Test endpoint for API verification
