@@ -455,6 +455,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get metrics for specific tweet IDs
+  app.get("/api/metrics", async (req, res) => {
+    try {
+      const ids = req.query.ids; // comma-separated tweet IDs
+      if (!ids) {
+        return res.status(400).json({ error: "Missing tweet ids" });
+      }
+
+      // Find the most recent active X account (same pattern as other endpoints)
+      const allAccounts = await storage.getSocialAccounts();
+      const xAccounts = allAccounts.filter((acc: any) => 
+        acc.platform === "x" && 
+        acc.isActive && 
+        acc.accessToken
+      );
+      
+      if (xAccounts.length === 0) {
+        return res.status(400).json({ 
+          error: "No connected X account found",
+          suggestion: "Please connect your X account first via /auth/x/start"
+        });
+      }
+      
+      // Use the most recently connected X account
+      const socialAccount = xAccounts.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+
+      // Get valid access token (automatically refreshes if needed)
+      let validAccessToken: string;
+      try {
+        const tokenResult = await getValidAccessToken(socialAccount.userId, "x");
+        validAccessToken = tokenResult.accessToken;
+        
+        if (tokenResult.isRefreshed) {
+          console.log("✅ Token refreshed successfully for metrics");
+        }
+      } catch (tokenError: any) {
+        console.error("❌ Token validation/refresh failed for metrics:", tokenError);
+        return res.status(401).json({
+          error: "Failed to obtain valid access token for metrics",
+          suggestion: "Please re-authenticate your X account",
+          details: tokenError?.message
+        });
+      }
+
+      const url = new URL("https://api.x.com/2/tweets");
+      url.searchParams.set("ids", ids as string);
+      url.searchParams.set("tweet.fields", "public_metrics,created_at");
+
+      const resp = await fetch(url.toString(), {
+        headers: { "Authorization": `Bearer ${validAccessToken}` }
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        return res.status(502).json(data);
+      }
+
+      res.json(data);
+    } catch (err) {
+      console.error("Metrics error:", err);
+      res.status(500).json({ error: "Server error" });
+    }
+  });
+
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
     res.json({ 
@@ -467,7 +533,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           callback: "GET /auth/x/callback"
         },
         posting: "POST /api/post",
-        metrics: "POST /api/metrics/fetch",
+        metrics: {
+          fetch: "POST /api/metrics/fetch",
+          query: "GET /api/metrics?ids=comma,separated,tweet,ids"
+        },
         accounts: "GET /api/accounts/:userId",
         posts: "GET /api/posts/:userId",
         status: "GET /api/status (with accounts and posts)",
