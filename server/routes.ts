@@ -526,6 +526,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get user's timeline (their own tweets)
+  app.get("/api/timeline", async (req, res, next) => {
+    try {
+      // Find the most recent active X account
+      const allAccounts = await storage.getSocialAccounts();
+      const xAccounts = allAccounts.filter((acc: any) => 
+        acc.platform === "x" && 
+        acc.isActive && 
+        acc.accessToken
+      );
+      
+      if (xAccounts.length === 0) {
+        return res.status(400).json({
+          error: "No connected X account found",
+          suggestion: "Connect via /auth/x/start"
+        });
+      }
+
+      // Use the most recently connected X account
+      const account = xAccounts.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+
+      const access = await getValidAccessToken("default");
+      const userId = account.accountId; // X user ID stored in accountId field
+
+      const url = `https://api.x.com/2/users/${userId}/tweets?tweet.fields=created_at,public_metrics`;
+
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${access}` }
+      });
+
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        return res.status(502).json({
+          error: "X API error",
+          status: r.status,
+          details: data
+        });
+      }
+
+      return res.json(data);
+    } catch (err) {
+      return next(err);
+    }
+  });
+
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
     res.json({ 
