@@ -3,7 +3,34 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import cors from "cors";
 import { DEMO_USER_ID } from "./auth";
-import { getValidAccessToken } from "./src/token-refresh";
+import { getValidAccessToken as getValidAccessTokenInternal } from "./src/token-refresh";
+
+// Simplified wrapper for getting valid access token from default X account
+async function getValidAccessToken(accountType: string): Promise<string> {
+  if (accountType !== "default") {
+    throw new Error("Only 'default' account type is supported");
+  }
+
+  // Find the most recent active X account
+  const allAccounts = await storage.getSocialAccounts();
+  const xAccounts = allAccounts.filter((acc: any) => 
+    acc.platform === "x" && 
+    acc.isActive && 
+    acc.accessToken
+  );
+  
+  if (xAccounts.length === 0) {
+    throw new Error("No connected X account found");
+  }
+
+  // Use the most recently connected X account
+  const socialAccount = xAccounts.sort((a: any, b: any) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0];
+
+  const tokenResult = await getValidAccessTokenInternal(socialAccount.userId, "x");
+  return tokenResult.accessToken;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS middleware
@@ -161,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get valid access token (automatically refreshes if needed)
       let validAccessToken: string;
       try {
-        const tokenResult = await getValidAccessToken(socialAccount.userId, platform);
+        const tokenResult = await getValidAccessTokenInternal(socialAccount.userId, platform);
         validAccessToken = tokenResult.accessToken;
         
         if (tokenResult.isRefreshed) {
@@ -279,7 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get valid access token for metrics (automatically refreshes if needed)
       let validAccessToken: string;
       try {
-        const tokenResult = await getValidAccessToken(socialAccount.userId, "x");
+        const tokenResult = await getValidAccessTokenInternal(socialAccount.userId, "x");
         validAccessToken = tokenResult.accessToken;
         
         if (tokenResult.isRefreshed) {
@@ -456,68 +483,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get metrics for specific tweet IDs
-  app.get("/api/metrics", async (req, res) => {
+  app.get("/api/metrics", async (req, res, next) => {
     try {
-      const ids = req.query.ids as string;
-      if (!ids) {
-        return res.status(400).json({ error: "Missing tweet ids" });
+      let ids: string[] = [];
+
+      // support ?ids=123,456 or ?ids[]=123&ids[]=456
+      if (Array.isArray(req.query.ids)) {
+        ids = (req.query.ids as string[]).map(s => s.trim()).filter(Boolean);
+      } else if (typeof req.query.ids === "string") {
+        ids = req.query.ids.split(",").map(s => s.trim()).filter(Boolean);
       }
 
-      // Find the most recent active X account (same pattern as other endpoints)
-      const allAccounts = await storage.getSocialAccounts();
-      const xAccounts = allAccounts.filter((acc: any) => 
-        acc.platform === "x" && 
-        acc.isActive && 
-        acc.accessToken
-      );
-      
-      if (xAccounts.length === 0) {
-        return res.status(400).json({ 
-          error: "No connected X account found",
-          suggestion: "Please connect your X account first via /auth/x/start"
-        });
-      }
-      
-      // Use the most recently connected X account
-      const socialAccount = xAccounts.sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
-
-      // Get valid access token (automatically refreshes if needed)
-      let validAccessToken: string;
-      try {
-        const tokenResult = await getValidAccessToken(socialAccount.userId, "x");
-        validAccessToken = tokenResult.accessToken;
-        
-        if (tokenResult.isRefreshed) {
-          console.log("✅ Token refreshed successfully for metrics");
-        }
-      } catch (tokenError: any) {
-        console.error("❌ Token validation/refresh failed for metrics:", tokenError);
-        return res.status(401).json({
-          error: "Failed to obtain valid access token for metrics",
-          suggestion: "Please re-authenticate your X account",
-          details: tokenError?.message
+      if (!ids.length) {
+        return res.status(400).json({
+          error: "Missing tweet ids",
+          hint: "Pass ?ids=123,456 or ?ids[]=123&ids[]=456"
         });
       }
 
+      // ...lookup account, get token, build request
+      const access = await getValidAccessToken("default");
       const url = new URL("https://api.x.com/2/tweets");
-      url.searchParams.set("ids", ids as string);
+      url.searchParams.set("ids", ids.join(","));
       url.searchParams.set("tweet.fields", "public_metrics,created_at");
 
-      const resp = await fetch(url.toString(), {
-        headers: { "Authorization": `Bearer ${validAccessToken}` }
+      const r = await fetch(url.toString(), {
+        headers: { Authorization: `Bearer ${access}` }
       });
 
-      const data = await resp.json();
-      if (!resp.ok) {
-        return res.status(502).json(data);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        return res.status(502).json({
+          error: "X API error",
+          status: r.status,
+          details: data
+        });
       }
 
-      res.json(data);
+      return res.json(data);
     } catch (err) {
-      console.error("Metrics error:", err);
-      res.status(500).json({ error: "Server error" });
+      return next(err);
     }
   });
 
