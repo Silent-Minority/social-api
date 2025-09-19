@@ -458,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get metrics for specific tweet IDs
   app.get("/api/metrics", async (req, res) => {
     try {
-      const ids = req.query.ids; // comma-separated tweet IDs
+      const ids = req.query.ids as string;
       if (!ids) {
         return res.status(400).json({ error: "Missing tweet ids" });
       }
