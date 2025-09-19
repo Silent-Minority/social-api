@@ -21,7 +21,7 @@ router.get('/auth/x/start', (req, res) => {
       return res.status(500).send('OAuth configuration not complete. Please set X_REDIRECT_URI and X_SCOPES in Replit Secrets.');
     }
 
-    const { codeChallenge, state } = generatePKCE();
+    const { codeChallenge, state } = generatePKCE(res);
     
     const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge, scopes);
     
@@ -50,7 +50,7 @@ router.get('/auth/x/callback', async (req, res) => {
       return res.status(400).send('Missing authorization code or state parameter');
     }
 
-    const codeVerifier = retrieveCodeVerifier(state);
+    const codeVerifier = retrieveCodeVerifier(state, req, res);
     console.log('🔑 Code verifier retrieval:', { state, found: !!codeVerifier });
     
     if (!codeVerifier) {

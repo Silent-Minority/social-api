@@ -1,6 +1,7 @@
 import crypto from 'crypto';
+import { Request, Response } from 'express';
 
-// In-memory storage for PKCE verifiers (in production, use Redis or similar)
+// In-memory storage for PKCE verifiers (fallback only)
 const pkceStore = new Map<string, { codeVerifier: string; timestamp: number }>();
 
 // Clean up expired PKCE verifiers (older than 10 minutes)
@@ -16,7 +17,7 @@ setInterval(() => {
 }, 5 * 60 * 1000); // Clean up every 5 minutes
 
 // Generate PKCE code verifier and challenge
-export function generatePKCE(): { codeVerifier: string; codeChallenge: string; state: string } {
+export function generatePKCE(res: Response): { codeVerifier: string; codeChallenge: string; state: string } {
   const codeVerifier = crypto.randomBytes(32).toString('base64url');
   const codeChallenge = crypto.createHash('sha256')
     .update(codeVerifier)
@@ -24,27 +25,68 @@ export function generatePKCE(): { codeVerifier: string; codeChallenge: string; s
   
   const state = crypto.randomBytes(16).toString('hex');
   
-  // Store the code verifier temporarily
+  // Store the code verifier in a secure cookie (survives server restarts)
+  const cookieValue = JSON.stringify({
+    codeVerifier,
+    timestamp: Date.now()
+  });
+  
+  res.cookie(`oauth_pkce_${state}`, cookieValue, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 20 * 60 * 1000 // 20 minutes
+  });
+  
+  // Also store in memory as fallback
   pkceStore.set(state, {
     codeVerifier,
     timestamp: Date.now()
   });
   
+  console.log('🍪 PKCE data stored in cookie:', { state, cookieSet: true });
+  
   return { codeVerifier, codeChallenge, state };
 }
 
 // Retrieve and remove PKCE code verifier
-export function retrieveCodeVerifier(state: string): string | null {
-  const data = pkceStore.get(state);
+export function retrieveCodeVerifier(state: string, req: Request, res: Response): string | null {
+  const cookieName = `oauth_pkce_${state}`;
+  
+  // First try to get from cookie (persistent across restarts)
+  const cookieValue = req.cookies[cookieName];
+  
+  if (cookieValue) {
+    try {
+      const data = JSON.parse(cookieValue);
+      const now = Date.now();
+      const twentyMinutes = 20 * 60 * 1000;
+      
+      if (data.codeVerifier && (now - data.timestamp) < twentyMinutes) {
+        // Clear the cookie
+        res.clearCookie(cookieName);
+        console.log('🍪 PKCE retrieved from cookie:', { state, found: true });
+        return data.codeVerifier;
+      }
+    } catch (error) {
+      console.error('Cookie parse error:', error);
+    }
+  }
+  
+  // Fallback to in-memory store
+  const memData = pkceStore.get(state);
   console.log('🗂️  PKCE Store lookup:', { 
-    found: !!data, 
+    cookieFound: !!cookieValue,
+    memoryFound: !!memData, 
     storeSize: pkceStore.size
   });
   
-  if (!data) return null;
+  if (memData) {
+    pkceStore.delete(state);
+    return memData.codeVerifier;
+  }
   
-  pkceStore.delete(state);
-  return data.codeVerifier;
+  return null;
 }
 
 // Build Twitter OAuth authorization URL
