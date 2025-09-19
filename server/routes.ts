@@ -423,7 +423,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For demo purposes, get all accounts from all users
       // In production, filter by authenticated user
       const accounts = await storage.getSocialAccounts();
-      res.json(accounts);
+      
+      // 🔒 SECURITY: Strip sensitive token data from response
+      const sanitizedAccounts = accounts.map(account => ({
+        id: account.id,
+        platform: account.platform,
+        accountId: account.accountId,
+        accountUsername: account.accountUsername,
+        isActive: account.isActive,
+        hasValidToken: !!account.accessToken && 
+          (!account.tokenExpiresAt || account.tokenExpiresAt > new Date()),
+        connectedAt: account.createdAt,
+        tokenExpiresAt: account.tokenExpiresAt,
+        scope: account.scope
+        // accessToken and refreshToken are deliberately excluded for security
+      }));
+      
+      res.json(sanitizedAccounts);
     } catch (error) {
       console.error("Error fetching social accounts:", error);
       res.status(500).json({ error: "Failed to get social accounts" });

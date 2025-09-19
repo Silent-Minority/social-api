@@ -104,7 +104,11 @@ export async function ensureFreshAccessToken(row?: any): Promise<string | null> 
   });
   const tok = await res.json();
   if (!res.ok) {
-    console.error("Refresh failed:", tok);
+    console.error("Refresh failed:", { 
+      status: res.status, 
+      statusText: res.statusText,
+      error: tok.error || '[REDACTED_TOKEN_RESPONSE]' 
+    });
     return row.access_token;
   }
   const expires_at = Math.floor(Date.now() / 1000) + (tok.expires_in ?? 3600);
