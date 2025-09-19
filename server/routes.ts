@@ -5,7 +5,7 @@ import cors from "cors";
 import { DEMO_USER_ID } from "./auth";
 import { getValidAccessToken as getValidAccessTokenInternal } from "./src/token-refresh";
 import * as xService from "./services/x";
-import { getUserProfile } from "./controllers/userController";
+import userRoutes from "./routes/userRoutes";
 
 // Simplified wrapper for getting valid access token from default X account
 async function getValidAccessToken(accountType: string): Promise<string> {
@@ -587,8 +587,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return handleTimelineRequest(req, res, next);
   });
 
-  // Get user profile from X API
-  app.get("/api/user/profile", getUserProfile);
+  // Mount user routes
+  app.use("/api/user", userRoutes);
 
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
