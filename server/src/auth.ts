@@ -35,33 +35,75 @@ router.get('/auth/x/start', (req, res) => {
   }
 });
 
+// Helper function to clear OAuth cookies securely
+function clearOAuthCookie(res: express.Response, state: string): void {
+  const cookieName = `oauth_pkce_${state}`;
+  res.clearCookie(cookieName, {
+    httpOnly: true,
+    signed: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax'
+  });
+  console.log('🧹 OAuth cookie cleared:', { cookieName, state });
+}
+
 // Handle OAuth callback
 router.get('/auth/x/callback', async (req, res) => {
+  const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
+  
+  console.log('📞 OAuth callback received:', { 
+    hasCode: !!code, 
+    state, 
+    hasError: !!error,
+    queryParams: Object.keys(req.query),
+    timestamp: new Date().toISOString()
+  });
+  
   try {
-    const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
-    
-    console.log('📞 OAuth callback received:', { code: !!code, state, error });
-    
+    // Handle OAuth provider errors first
     if (error) {
+      console.error('❌ OAuth provider error:', { error, state });
+      if (state) clearOAuthCookie(res, state);
       return res.status(400).send(`OAuth error: ${error}`);
     }
     
+    // Validate required parameters
     if (!code || !state) {
+      console.error('❌ Missing OAuth parameters:', { hasCode: !!code, hasState: !!state });
+      if (state) clearOAuthCookie(res, state);
       return res.status(400).send('Missing authorization code or state parameter');
     }
 
+    console.log('🔐 Starting PKCE validation for state:', state);
+    
+    // Retrieve and validate PKCE data (includes explicit state validation)
     const codeVerifier = retrieveCodeVerifier(state, req, res);
-    console.log('🔑 Code verifier retrieval:', { state, found: !!codeVerifier });
+    
+    console.log('🔑 PKCE validation result:', { 
+      state, 
+      codeVerifierFound: !!codeVerifier,
+      validationPassed: !!codeVerifier
+    });
     
     if (!codeVerifier) {
+      console.error('❌ PKCE validation failed:', { 
+        state, 
+        reason: 'Invalid or expired OAuth state',
+        securityAlert: true 
+      });
+      
+      clearOAuthCookie(res, state);
       return res.status(400).json({ 
         error: "Invalid or expired OAuth state",
         debug: {
           received_state: state,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          message: "State validation failed - possible CSRF attack or session timeout"
         }
       });
     }
+    
+    console.log('✅ PKCE validation successful, proceeding with token exchange');
 
     const clientId = process.env.X_CLIENT_ID!;
     const clientSecret = process.env.X_CLIENT_SECRET!;
@@ -125,6 +167,16 @@ router.get('/auth/x/callback', async (req, res) => {
       });
     }
     
+    console.log('✅ OAuth flow completed successfully:', {
+      userId: user.id,
+      username: profile.username,
+      xAccountId: profile.id,
+      tokenExpiry: expiresAt?.toISOString()
+    });
+    
+    // Clear OAuth cookie on successful completion
+    clearOAuthCookie(res, state);
+    
     // Success redirect
     res.send(`
       <!DOCTYPE html>
@@ -167,7 +219,18 @@ router.get('/auth/x/callback', async (req, res) => {
       </html>
     `);
   } catch (error) {
-    console.error('OAuth callback error:', error);
+    console.error('❌ OAuth callback error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      state,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Clear OAuth cookie on error to prevent reuse
+    if (state) {
+      clearOAuthCookie(res, state);
+    }
+    
     res.status(500).send(`OAuth authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 });

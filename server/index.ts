@@ -12,7 +12,13 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
+
+// Ensure COOKIE_SECRET is set for signed cookies
+if (!process.env.COOKIE_SECRET) {
+  throw new Error('COOKIE_SECRET environment variable is required for secure cookie signing');
+}
+
+app.use(cookieParser(process.env.COOKIE_SECRET));
 
 app.use((req, res, next) => {
   const start = Date.now();
