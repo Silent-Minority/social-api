@@ -223,3 +223,42 @@ export async function getUserProfile(accessToken: string): Promise<{
   const data = await response.json();
   return data.data;
 }
+
+// Refresh access token using refresh token
+export async function refreshAccessToken(
+  refreshToken: string,
+  clientId: string,
+  clientSecret: string
+): Promise<{
+  access_token: string;
+  refresh_token?: string;
+  expires_in: number;
+  scope: string;
+}> {
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: clientId,
+    client_secret: clientSecret,
+  });
+
+  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: params.toString(),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Token refresh failed: ${error}`);
+  }
+
+  return response.json();
+}
+
+// Calculate token expiration date from expires_in seconds
+export function calculateTokenExpiration(expiresInSeconds: number): Date {
+  return new Date(Date.now() + expiresInSeconds * 1000);
+}

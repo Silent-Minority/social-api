@@ -1,5 +1,6 @@
 import express from 'express';
 import { generatePKCE, retrieveCodeVerifier, buildAuthUrl, exchangeCodeForTokens, getUserProfile } from './oauth';
+import { calculateTokenExpiration } from '../oauth';
 import { storage } from '../storage';
 
 const router = express.Router();
@@ -121,10 +122,17 @@ router.get('/auth/x/callback', async (req, res) => {
     // Get user profile
     const profile = await getUserProfile(tokenData.access_token);
     
-    // Calculate token expiration
+    // Calculate token expiration using centralized function
     const expiresAt = tokenData.expires_in 
-      ? new Date(Date.now() + tokenData.expires_in * 1000)
+      ? calculateTokenExpiration(tokenData.expires_in)
       : null;
+    
+    console.log('🔄 Token expiration calculation:', {
+      expiresInSeconds: tokenData.expires_in,
+      expiresAt: expiresAt?.toISOString(),
+      timeUntilExpiry: expiresAt ? `${Math.round((expiresAt.getTime() - Date.now()) / (60 * 1000))} minutes` : 'never',
+      hasRefreshToken: !!tokenData.refresh_token
+    });
     
     // Create or find user
     let user;

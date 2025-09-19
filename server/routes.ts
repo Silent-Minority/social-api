@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import cors from "cors";
 import { DEMO_USER_ID } from "./auth";
+import { getValidAccessToken } from "./src/token-refresh";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS middleware
@@ -157,52 +158,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )[0];
 
-      // Check if token is expired and needs refresh
-      if (socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= new Date()) {
-        if (!socialAccount.refreshToken) {
-          return res.status(401).json({
-            error: "Access token expired and no refresh token available",
-            suggestion: "Please re-authenticate your account"
-          });
-        }
+      // Get valid access token (automatically refreshes if needed)
+      let validAccessToken: string;
+      try {
+        const tokenResult = await getValidAccessToken(socialAccount.userId, platform);
+        validAccessToken = tokenResult.accessToken;
         
-        // Refresh the access token
-        const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
-        if (!clientId || !clientSecret) {
-          return res.status(500).json({ error: "OAuth 2.0 credentials not configured" });
+        if (tokenResult.isRefreshed) {
+          console.log("✅ Token refreshed successfully for posting");
+          // Re-fetch the updated social account to get the latest token info
+          const updatedAccount = await storage.getSocialAccountByPlatform(socialAccount.userId, platform);
+          if (updatedAccount) {
+            socialAccount = updatedAccount;
+          }
         }
-        
-        try {
-          const { TwitterOAuth, calculateTokenExpiration } = await import("./oauth");
-          const refreshedTokens = await TwitterOAuth.refreshAccessToken(
-            socialAccount.refreshToken,
-            clientId,
-            clientSecret
-          );
-          
-          // Update the social account with new tokens
-          const newExpiresAt = calculateTokenExpiration(refreshedTokens.expires_in);
-          await storage.updateSocialAccount(socialAccount.id, {
-            accessToken: refreshedTokens.access_token,
-            refreshToken: refreshedTokens.refresh_token || socialAccount.refreshToken,
-            tokenExpiresAt: newExpiresAt,
-            scope: refreshedTokens.scope
-          });
-          
-          // Update the local socialAccount object for this request
-          socialAccount.accessToken = refreshedTokens.access_token;
-          socialAccount.refreshToken = refreshedTokens.refresh_token || socialAccount.refreshToken;
-          socialAccount.tokenExpiresAt = newExpiresAt;
-          
-          console.log("Successfully refreshed access token for user:", socialAccount.userId);
-        } catch (refreshError: any) {
-          console.error("Token refresh failed:", refreshError);
-          return res.status(401).json({
-            error: "Failed to refresh access token",
-            suggestion: "Please re-authenticate your account",
-            details: refreshError?.message
-          });
-        }
+      } catch (tokenError: any) {
+        console.error("❌ Token validation/refresh failed:", tokenError);
+        return res.status(401).json({
+          error: "Failed to obtain valid access token",
+          suggestion: "Please re-authenticate your account",
+          details: tokenError?.message
+        });
       }
 
       // Create post record with pending status - use the actual user ID from social account
@@ -217,11 +193,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (platform === "x") {
           const { TwitterOAuth } = await import("./oauth");
           
-          // Post tweet - accessToken is guaranteed to exist at this point
-          if (!socialAccount.accessToken) {
-            throw new Error("Access token not available");
-          }
-          const tweetData = await TwitterOAuth.postTweet(socialAccount.accessToken, content);
+          // Post tweet using the validated access token
+          const tweetData = await TwitterOAuth.postTweet(validAccessToken, content);
           
           // Update post with success status and tweet ID
           await storage.updatePost(post.id, {
@@ -303,52 +276,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )[0];
 
-      // Check token expiration for metrics fetching and refresh if needed
-      if (socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= new Date()) {
-        if (!socialAccount.refreshToken) {
-          return res.status(401).json({
-            error: "Access token expired and no refresh token available",
-            suggestion: "Please re-authenticate your X account"
-          });
-        }
+      // Get valid access token for metrics (automatically refreshes if needed)
+      let validAccessToken: string;
+      try {
+        const tokenResult = await getValidAccessToken(socialAccount.userId, "x");
+        validAccessToken = tokenResult.accessToken;
         
-        // Refresh the access token
-        const { X_CLIENT_ID: clientId, X_CLIENT_SECRET: clientSecret } = process.env;
-        if (!clientId || !clientSecret) {
-          return res.status(500).json({ error: "OAuth 2.0 credentials not configured" });
+        if (tokenResult.isRefreshed) {
+          console.log("✅ Token refreshed successfully for metrics fetch");
+          // Re-fetch the updated social account to get the latest token info
+          const updatedAccount = await storage.getSocialAccountByPlatform(socialAccount.userId, "x");
+          if (updatedAccount) {
+            socialAccount = updatedAccount;
+          }
         }
-        
-        try {
-          const { TwitterOAuth, calculateTokenExpiration } = await import("./oauth");
-          const refreshedTokens = await TwitterOAuth.refreshAccessToken(
-            socialAccount.refreshToken,
-            clientId,
-            clientSecret
-          );
-          
-          // Update the social account with new tokens
-          const newExpiresAt = calculateTokenExpiration(refreshedTokens.expires_in);
-          await storage.updateSocialAccount(socialAccount.id, {
-            accessToken: refreshedTokens.access_token,
-            refreshToken: refreshedTokens.refresh_token || socialAccount.refreshToken,
-            tokenExpiresAt: newExpiresAt,
-            scope: refreshedTokens.scope
-          });
-          
-          // Update the local socialAccount object for this request
-          socialAccount.accessToken = refreshedTokens.access_token;
-          socialAccount.refreshToken = refreshedTokens.refresh_token || socialAccount.refreshToken;
-          socialAccount.tokenExpiresAt = newExpiresAt;
-          
-          console.log("Successfully refreshed access token for metrics:", socialAccount.userId);
-        } catch (refreshError: any) {
-          console.error("Metrics token refresh failed:", refreshError);
-          return res.status(401).json({
-            error: "Failed to refresh access token for metrics",
-            suggestion: "Please re-authenticate your X account",
-            details: refreshError?.message
-          });
-        }
+      } catch (tokenError: any) {
+        console.error("❌ Token validation/refresh failed for metrics:", tokenError);
+        return res.status(401).json({
+          error: "Failed to obtain valid access token for metrics",
+          suggestion: "Please re-authenticate your X account",
+          details: tokenError?.message
+        });
       }
 
       // Get recent posts that have tweet IDs but no recent metrics - use the same user as the social account
@@ -370,12 +318,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tweetIds = postsWithTweetIds.map(post => post.platformPostId!);
       
       try {
-        // Fetch metrics from X API - accessToken is guaranteed to exist at this point
-        if (!socialAccount.accessToken) {
-          throw new Error("Access token not available for metrics fetch");
-        }
+        // Fetch metrics from X API using the validated access token
         const metricsData = await TwitterOAuth.fetchTweetMetrics(
-          socialAccount.accessToken,
+          validAccessToken,
           tweetIds
         );
 
@@ -485,6 +430,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test token refresh functionality
+  app.post("/api/test/token-refresh", async (req, res) => {
+    try {
+      const { runAllTokenRefreshTests } = await import("./src/test-token-refresh");
+      
+      console.log("🧪 Starting token refresh tests via API endpoint...");
+      await runAllTokenRefreshTests();
+      
+      res.json({
+        success: true,
+        message: "Token refresh tests completed successfully",
+        timestamp: new Date().toISOString(),
+        testResults: "All tests passed - check server logs for detailed results"
+      });
+    } catch (error) {
+      console.error("❌ Token refresh tests failed:", error);
+      res.status(500).json({
+        success: false,
+        error: "Token refresh tests failed",
+        details: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
     res.json({ 
@@ -501,7 +471,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accounts: "GET /api/accounts/:userId",
         posts: "GET /api/posts/:userId",
         status: "GET /api/status (with accounts and posts)",
-        health: "GET /health"
+        health: "GET /health",
+        testing: {
+          tokenRefresh: "POST /api/test/token-refresh"
+        }
       }
     });
   });
