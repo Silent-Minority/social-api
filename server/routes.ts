@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import cors from "cors";
 import { DEMO_USER_ID } from "./auth";
 import { getValidAccessToken as getValidAccessTokenInternal } from "./src/token-refresh";
+import * as xService from "./services/x";
 
 // Simplified wrapper for getting valid access token from default X account
 async function getValidAccessToken(accountType: string): Promise<string> {
@@ -529,40 +530,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's timeline (their own tweets)
   app.get("/api/timeline", async (req, res, next) => {
     try {
-      // Find the most recent active X account
-      const allAccounts = await storage.getSocialAccounts();
-      const xAccounts = allAccounts.filter((acc: any) => 
-        acc.platform === "x" && 
-        acc.isActive && 
-        acc.accessToken
-      );
-      
-      if (xAccounts.length === 0) {
+      // Resolve the active X account
+      const account = await xService.resolveActiveXAccount();
+      if (!account) {
         return res.status(400).json({
           error: "No connected X account found",
           suggestion: "Connect via /auth/x/start"
         });
       }
 
-      // Use the most recently connected X account
-      const account = xAccounts.sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
+      // Get valid access token
+      const accessToken = await xService.getXAccessToken();
 
-      const access = await getValidAccessToken("default");
-      const userId = account.accountId; // X user ID stored in accountId field
+      // Parse query parameters
+      const count = Math.min(parseInt(req.query.count as string) || 5, 100);
+      const paginationToken = req.query.pagination_token as string;
+      const tweetFields = req.query.tweet_fields as string || "created_at,public_metrics";
 
-      const url = `https://api.x.com/2/users/${userId}/tweets?tweet.fields=created_at,public_metrics`;
+      // Fetch user's tweets
+      const { response, data } = await xService.fetchUserTweets(
+        accessToken,
+        account.accountId,
+        {
+          max_results: count,
+          pagination_token: paginationToken,
+          tweet_fields: tweetFields
+        }
+      );
 
-      const r = await fetch(url, {
-        headers: { Authorization: `Bearer ${access}` }
-      });
-
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
+      if (!response.ok) {
         return res.status(502).json({
           error: "X API error",
-          status: r.status,
+          status: response.status,
           details: data
         });
       }
