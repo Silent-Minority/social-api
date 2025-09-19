@@ -149,30 +149,127 @@ router.get('/auth/x/callback', async (req, res) => {
       throw new Error("Failed to create user account");
     }
 
-    // Store social account tokens
-    const existingAccount = await storage.getSocialAccountByPlatform(user.id, "x");
-    
-    if (existingAccount) {
-      await storage.updateSocialAccount(existingAccount.id, {
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token || null,
-        tokenExpiresAt: expiresAt,
-        scope: tokenData.scope,
-        accountUsername: profile.username,
-        isActive: true,
-      });
-    } else {
-      await storage.createSocialAccount({
+    // Store social account tokens with comprehensive error handling
+    try {
+      console.log('💾 Storing social account tokens:', {
         userId: user.id,
         platform: "x",
         accountId: profile.id,
         accountUsername: profile.username,
-        accessToken: tokenData.access_token,
-        refreshToken: tokenData.refresh_token || null,
-        tokenExpiresAt: expiresAt,
-        scope: tokenData.scope,
-        isActive: true,
+        hasAccessToken: !!tokenData.access_token,
+        hasRefreshToken: !!tokenData.refresh_token,
+        expiresAt: expiresAt?.toISOString()
       });
+
+      const existingAccount = await storage.getSocialAccountByPlatform(user.id, "x");
+      
+      if (existingAccount) {
+        console.log('🔄 Updating existing social account:', {
+          accountId: existingAccount.id,
+          previousUsername: existingAccount.accountUsername,
+          newUsername: profile.username
+        });
+
+        await storage.updateSocialAccount(existingAccount.id, {
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || null,
+          tokenExpiresAt: expiresAt,
+          scope: tokenData.scope,
+          accountUsername: profile.username,
+          isActive: true,
+        });
+        
+        console.log('✅ Social account updated successfully');
+      } else {
+        console.log('➕ Creating new social account');
+
+        const newAccount = await storage.createSocialAccount({
+          userId: user.id,
+          platform: "x",
+          accountId: profile.id,
+          accountUsername: profile.username,
+          accessToken: tokenData.access_token,
+          refreshToken: tokenData.refresh_token || null,
+          tokenExpiresAt: expiresAt,
+          scope: tokenData.scope,
+          isActive: true,
+        });
+        
+        console.log('✅ Social account created successfully:', {
+          newAccountId: newAccount.id,
+          accountUsername: newAccount.accountUsername,
+          platform: newAccount.platform
+        });
+      }
+    } catch (socialAccountError) {
+      console.error('❌ CRITICAL ERROR: Failed to store social account:', {
+        error: socialAccountError,
+        message: socialAccountError.message,
+        stack: socialAccountError.stack,
+        userId: user.id,
+        twitterId: profile.id,
+        username: profile.username
+      });
+      
+      // Clear OAuth cookie on error
+      clearOAuthCookie(res, state);
+      
+      // Return error to user - show details only in development
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const errorId = Math.random().toString(36).substring(2, 15); // Simple error correlation ID
+      
+      // Log error with correlation ID for production troubleshooting
+      console.error(`❌ OAuth error [${errorId}]:`, {
+        errorId,
+        environment: process.env.NODE_ENV,
+        message: socialAccountError.message,
+        userId: user.id,
+        twitterId: profile.id,
+        username: profile.username
+      });
+      
+      return res.status(500).send(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Connection Failed</title>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; 
+                max-width: 500px; 
+                margin: 100px auto; 
+                padding: 20px; 
+                text-align: center; 
+              }
+              .error { color: #dc2626; }
+              .details { background: #fef2f2; padding: 16px; border-radius: 8px; margin: 20px 0; text-align: left; }
+            </style>
+          </head>
+          <body>
+            <h1 class="error">Twitter Connection Failed</h1>
+            ${isDevelopment ? `
+              <div class="details">
+                <strong>Error:</strong> Unable to save your Twitter account connection.<br>
+                <strong>Details:</strong> ${socialAccountError.message}<br>
+                <strong>User ID:</strong> ${user.id}<br>
+                <strong>Twitter ID:</strong> ${profile.id}<br>
+                <strong>Error ID:</strong> ${errorId}
+              </div>
+            ` : `
+              <div class="details">
+                <strong>Error:</strong> Unable to save your Twitter account connection.<br>
+                <strong>Error ID:</strong> ${errorId}
+              </div>
+            `}
+            <p>Please try connecting again or contact support if the issue persists.</p>
+            <script>
+              setTimeout(() => {
+                window.close();
+              }, 10000);
+            </script>
+          </body>
+        </html>
+      `);
     }
     
     console.log('✅ OAuth flow completed successfully:', {
