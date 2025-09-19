@@ -17,9 +17,9 @@ async function getValidAccessToken(accountType: string): Promise<string> {
   // Find the most recent active X account
   const allAccounts = await storage.getSocialAccounts();
   const xAccounts = allAccounts.filter((acc: any) => 
-    acc.platform === "x" && 
+    (acc.platform === "x" || acc.platform === "twitter") && 
     acc.isActive && 
-    acc.accessToken
+    (acc.accessToken || acc.refreshToken)
   );
   
   if (xAccounts.length === 0) {
@@ -175,9 +175,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In production, get from authenticated session
       const allAccounts = await storage.getSocialAccounts();
       const xAccounts = allAccounts.filter((acc: any) => 
-        acc.platform === "x" && 
+        (acc.platform === "x" || acc.platform === "twitter") && 
         acc.isActive && 
-        acc.accessToken
+        (acc.accessToken || acc.refreshToken)
       );
       
       if (xAccounts.length === 0) {
