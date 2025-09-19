@@ -156,120 +156,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Post to social media (with actual posting to X)
-  app.post("/api/post", async (req, res) => {
-    try {
-      const { content, platform } = req.body;
-      
-      // For demo, find the most recently connected user account
-      // In production, get userId from authenticated session
-      
-      if (!content || !platform) {
-        return res.status(400).json({ error: "Missing required fields: content, platform" });
-      }
-
-      // Find the most recent active social account for this platform
-      const allAccounts = await storage.getSocialAccounts();
-      const platformAccounts = allAccounts.filter((acc: any) => 
-        acc.platform === platform && 
-        acc.isActive && 
-        acc.accessToken
-      );
-      
-      if (platformAccounts.length === 0) {
-        return res.status(400).json({ 
-          error: `No connected ${platform} account found`,
-          suggestion: `Please connect your ${platform} account first via /auth/${platform}/start`
-        });
-      }
-      
-      // Use the most recently connected account
-      let socialAccount = platformAccounts.sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      )[0];
-
-      // Get valid access token (automatically refreshes if needed)
-      let validAccessToken: string;
-      try {
-        const tokenResult = await getValidAccessTokenInternal(socialAccount.userId, platform);
-        validAccessToken = tokenResult.accessToken;
-        
-        if (tokenResult.isRefreshed) {
-          console.log("✅ Token refreshed successfully for posting");
-          // Re-fetch the updated social account to get the latest token info
-          const updatedAccount = await storage.getSocialAccountByPlatform(socialAccount.userId, platform);
-          if (updatedAccount) {
-            socialAccount = updatedAccount;
-          }
-        }
-      } catch (tokenError: any) {
-        console.error("❌ Token validation/refresh failed:", tokenError);
-        return res.status(401).json({
-          error: "Failed to obtain valid access token",
-          suggestion: "Please re-authenticate your account",
-          details: tokenError?.message
-        });
-      }
-
-      // Create post record with pending status - use the actual user ID from social account
-      const post = await storage.createPost({
-        content,
-        platform,
-        userId: socialAccount.userId, // Use the actual user ID, not DEMO_USER_ID
-        status: "pending"
-      });
-
-      try {
-        if (platform === "x") {
-          const { TwitterOAuth } = await import("./oauth");
-          
-          // Post tweet using the validated access token
-          const tweetData = await TwitterOAuth.postTweet(validAccessToken, content);
-          
-          // Update post with success status and tweet ID
-          await storage.updatePost(post.id, {
-            status: "posted",
-            platformPostId: tweetData.id,
-          });
-
-          res.status(201).json({
-            ...post,
-            status: "posted",
-            platformPostId: tweetData.id,
-            tweet: tweetData
-          });
-        } else {
-          // Other platforms not implemented yet
-          await storage.updatePost(post.id, {
-            status: "failed",
-            error: `Platform ${platform} not yet implemented`
-          });
-          
-          res.status(501).json({ 
-            error: `Posting to ${platform} is not yet implemented`,
-            post: { ...post, status: "failed" }
-          });
-        }
-      } catch (postError: any) {
-        console.error("Posting error:", postError);
-        
-        // Update post with failed status
-        await storage.updatePost(post.id, {
-          status: "failed",
-          error: postError?.message || String(postError)
-        });
-
-        res.status(500).json({ 
-          error: "Failed to post to social media",
-          details: postError?.message || String(postError),
-          post: { ...post, status: "failed" }
-        });
-      }
-    } catch (error) {
-      console.error("Post creation error:", error);
-      res.status(500).json({ error: "Failed to create post" });
-    }
-  });
 
   // Get posts for a user
   app.get("/api/posts/:userId", async (req, res) => {
@@ -592,7 +478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/user", userRoutes);
 
   // Mount post routes
-  app.use("/api/posts", postRoutes);
+  app.use("/api/post", postRoutes);
 
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
