@@ -1,8 +1,8 @@
-import { resolveProfileAndToken } from "../services/userService.js";
+import { resolveAccountAndToken } from "../services/userService.js";
 
 export async function getUserProfile(req: any, res: any, next: any) {
   try {
-    const { account, access } = await resolveProfileAndToken("default");
+    const { account, access } = await resolveAccountAndToken("default");
 
     const url = `https://api.x.com/2/users/${account.accountId}?user.fields=profile_image_url,description,public_metrics`;
 

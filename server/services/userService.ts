@@ -1,7 +1,7 @@
 import { storage } from "../storage.js";
 import { getValidAccessToken } from "../src/token-refresh.js";
 
-export async function resolveProfileAndToken(userId = "default") {
+export async function resolveAccountAndToken(userId = "default") {
   // Get all accounts and find the most recent active X account (demo pattern)
   const allAccounts = await storage.getSocialAccounts();
   const xAccounts = allAccounts.filter((acc: any) => 
