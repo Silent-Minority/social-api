@@ -184,13 +184,15 @@ export async function exchangeCodeForTokens(
     redirect_uri: redirectUri,
     code_verifier: codeVerifier,
     client_id: clientId,
-    client_secret: clientSecret,
   });
+
+  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${authHeader}`,
     },
     body: params.toString(),
   });
@@ -239,13 +241,15 @@ export async function refreshAccessToken(
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     client_id: clientId,
-    client_secret: clientSecret,
   });
+
+  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
+      'Authorization': `Basic ${authHeader}`,
     },
     body: params.toString(),
   });
