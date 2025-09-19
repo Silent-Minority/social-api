@@ -6,6 +6,7 @@ import { DEMO_USER_ID } from "./auth";
 import { getValidAccessToken as getValidAccessTokenInternal } from "./src/token-refresh";
 import * as xService from "./services/x";
 import userRoutes from "./routes/userRoutes";
+import postRoutes from "./routes/postRoutes";
 
 // Simplified wrapper for getting valid access token from default X account
 async function getValidAccessToken(accountType: string): Promise<string> {
@@ -589,6 +590,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Mount user routes
   app.use("/api/user", userRoutes);
+
+  // Mount post routes
+  app.use("/api/posts", postRoutes);
 
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
