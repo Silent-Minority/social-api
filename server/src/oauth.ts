@@ -64,6 +64,12 @@ export function retrieveCodeVerifier(state: string, req: Request, res: Response)
   const cookieName = `oauth_pkce_${state}`;
   
   console.log('🔍 PKCE retrieval attempt:', { requestedState: state, cookieName });
+  console.log('🍪 Available cookies debug:', {
+    allCookies: Object.keys(req.cookies || {}),
+    allSignedCookies: Object.keys(req.signedCookies || {}),
+    cookieSecret: !!process.env.COOKIE_SECRET,
+    targetCookie: req.signedCookies[cookieName]
+  });
   
   // First try to get from signed cookie (persistent across restarts)
   const cookieValue = req.signedCookies[cookieName];
