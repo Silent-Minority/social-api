@@ -27,6 +27,7 @@ export interface IStorage {
   // Post operations
   getPost(id: string): Promise<Post | undefined>;
   getPostsByUser(userId: string): Promise<Post[]>;
+  getPostsByAccount(accountId: string): Promise<Post[]>;
   getPostsWithMetrics(userId: string, limit?: number): Promise<Array<Post & { metrics?: TweetMetrics }>>;
   createPost(post: InsertPost): Promise<Post>;
   updatePost(id: string, updates: Partial<Post>): Promise<Post | undefined>;
@@ -110,6 +111,12 @@ export class DatabaseStorage implements IStorage {
   async getPostsByUser(userId: string): Promise<Post[]> {
     return await db.select().from(posts)
       .where(eq(posts.userId, userId))
+      .orderBy(desc(posts.createdAt));
+  }
+
+  async getPostsByAccount(accountId: string): Promise<Post[]> {
+    return await db.select().from(posts)
+      .where(eq(posts.accountId, accountId))
       .orderBy(desc(posts.createdAt));
   }
 

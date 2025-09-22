@@ -32,6 +32,7 @@ export async function postTweet(req: any, res: any, next: any) {
     // Save successful post to database
     const post = await storage.createPost({
       userId: account.userId,
+      accountId: account.id, // Link to the specific social account
       content: text,
       platform: "x",
       platformPostId: data.data?.id,

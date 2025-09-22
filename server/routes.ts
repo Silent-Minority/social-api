@@ -96,12 +96,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
             (!account.tokenExpiresAt || account.tokenExpiresAt > new Date())
         }));
 
-        // Get recent posts with metrics from any active accounts
-        if (allAccounts.length > 0) {
-          // Get posts from the most recent account for simplicity
-          const mostRecentAccount = allAccounts[0];
-          recentPosts = await storage.getPostsWithMetrics(mostRecentAccount.userId, 10);
-        }
+        // For each account, get recent posts linked to that account
+        const accountsWithPosts = await Promise.all(
+          allAccounts.map(async (account) => {
+            // Get recent posts for this specific account
+            const posts = await storage.getPostsByAccount(account.id);
+            
+            return {
+              accountId: account.accountId, // Platform account ID (Twitter ID)
+              platform: account.platform,
+              username: account.accountUsername,
+              isActive: account.isActive,
+              connectedAt: account.createdAt,
+              hasValidToken: !!account.accessToken && 
+                (!account.tokenExpiresAt || account.tokenExpiresAt > new Date()),
+              recentPosts: posts.slice(0, 10).map(post => ({
+                platformPostId: post.platformPostId,
+                content: post.content,
+                status: post.status,
+                createdAt: post.createdAt
+              }))
+            };
+          })
+        );
+        
+        connectedAccounts = accountsWithPosts;
       } catch (userError: any) {
         // If no users exist yet, that's fine - just return empty arrays
         console.log("No user data available yet:", userError?.message || userError);
@@ -112,24 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         port: process.env.PORT || 5000,
         environment: process.env.NODE_ENV || "development",
         ...stats,
-        connectedAccounts,
-        recentPosts: recentPosts.map(post => ({
-          id: post.id,
-          content: post.content.substring(0, 100) + (post.content.length > 100 ? '...' : ''),
-          platform: post.platform,
-          status: post.status,
-          platformPostId: post.platformPostId,
-          createdAt: post.createdAt,
-          metrics: post.metrics ? {
-            impressions: post.metrics.impressionCount,
-            retweets: post.metrics.retweetCount,
-            likes: post.metrics.likeCount,
-            replies: post.metrics.replyCount,
-            bookmarks: post.metrics.bookmarkCount,
-            quotes: post.metrics.quoteCount,
-            fetchedAt: post.metrics.fetchedAt
-          } : null
-        }))
+        connectedAccounts
       });
     } catch (error) {
       console.error("Status endpoint error:", error);

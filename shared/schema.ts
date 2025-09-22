@@ -26,6 +26,7 @@ export const socialAccounts = pgTable("social_accounts", {
 export const posts = pgTable("posts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  accountId: varchar("account_id").notNull().references(() => socialAccounts.id), // Link to social account
   content: text("content").notNull(),
   platform: text("platform").notNull(),
   platformPostId: text("platform_post_id"),
