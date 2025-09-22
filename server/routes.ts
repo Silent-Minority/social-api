@@ -74,11 +74,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       try {
         // In a real app, you'd get this from the authenticated user
-        // For demo, try to find any existing demo user account
-        // First try by the hardcoded demo ID, then by username
-        let allAccounts = await storage.getSocialAccountsByUser(DEMO_USER_ID);
+        // For demo, get all active social accounts from any user
+        let allAccounts = await storage.getSocialAccounts();
+        
+        // Filter to only active accounts with valid tokens
+        allAccounts = allAccounts.filter(account => account.isActive);
+        
+        // If no accounts found, try the hardcoded demo fallback
         if (allAccounts.length === 0) {
-          // Try to find demo user by username instead
           const demoUser = await storage.getUserByUsername("demo_user");
           if (demoUser) {
             allAccounts = await storage.getSocialAccountsByUser(demoUser.id);
