@@ -9,9 +9,9 @@ import { getValidAccessToken as getValidAccessTokenInternal } from "../src/token
 export async function resolveAccountAndToken() {
   const allAccounts = await storage.getSocialAccounts();
   const xAccounts = allAccounts.filter((acc: any) => 
-    acc.platform === "x" && 
+    (acc.platform === "x" || acc.platform === "twitter") && 
     acc.isActive && 
-    acc.accessToken
+    (acc.accessToken || acc.refreshToken)
   );
   
   if (xAccounts.length === 0) {
