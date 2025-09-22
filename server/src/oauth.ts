@@ -37,7 +37,8 @@ export function generatePKCE(res: Response): { codeVerifier: string; codeChallen
     signed: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,
-    maxAge: 20 * 60 * 1000 // 20 minutes
+    maxAge: 20 * 60 * 1000, // 20 minutes
+    domain: process.env.NODE_ENV === 'production' ? '.mirancourt.com' : undefined // Allow subdomains in production
   };
   
   res.cookie(`oauth_pkce_${state}`, JSON.stringify(cookiePayload), cookieOptions);

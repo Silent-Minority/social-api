@@ -43,7 +43,8 @@ function clearOAuthCookie(res: express.Response, state: string): void {
     httpOnly: true,
     signed: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax'
+    sameSite: 'lax',
+    domain: process.env.NODE_ENV === 'production' ? '.mirancourt.com' : undefined
   });
   console.log('🧹 OAuth cookie cleared:', { cookieName, state });
 }
