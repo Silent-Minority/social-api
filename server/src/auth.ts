@@ -120,6 +120,9 @@ router.get('/auth/x/callback', async (req, res) => {
       redirectUri
     );
 
+    // LOG THE FULL TOKEN DATA
+    console.log('🔍 Full tokenData:', tokenData);
+
     // Get user profile
     const profile = await getUserProfile(tokenData.access_token);
     
