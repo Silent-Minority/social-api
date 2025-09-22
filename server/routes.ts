@@ -96,9 +96,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             (!account.tokenExpiresAt || account.tokenExpiresAt > new Date())
         }));
 
-        // Get recent posts with metrics
+        // Get recent posts with metrics from any active accounts
         if (allAccounts.length > 0) {
-          recentPosts = await storage.getPostsWithMetrics(allAccounts[0].userId, 10);
+          // Get posts from the most recent account for simplicity
+          const mostRecentAccount = allAccounts[0];
+          recentPosts = await storage.getPostsWithMetrics(mostRecentAccount.userId, 10);
         }
       } catch (userError: any) {
         // If no users exist yet, that's fine - just return empty arrays

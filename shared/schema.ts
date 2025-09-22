@@ -90,7 +90,6 @@ export const insertSocialAccountSchema = createInsertSchema(socialAccounts).omit
 export const insertPostSchema = createInsertSchema(posts).omit({
   id: true,
   createdAt: true,
-  platformPostId: true,
 });
 
 export const insertApiLogSchema = createInsertSchema(apiLogs).omit({

@@ -202,11 +202,11 @@ router.get('/auth/x/callback', async (req, res) => {
           platform: newAccount.platform
         });
       }
-    } catch (socialAccountError) {
+    } catch (socialAccountError: any) {
       console.error('❌ CRITICAL ERROR: Failed to store social account:', {
         error: socialAccountError,
-        message: socialAccountError.message,
-        stack: socialAccountError.stack,
+        message: socialAccountError?.message,
+        stack: socialAccountError?.stack,
         userId: user.id,
         twitterId: profile.id,
         username: profile.username
@@ -223,7 +223,7 @@ router.get('/auth/x/callback', async (req, res) => {
       console.error(`❌ OAuth error [${errorId}]:`, {
         errorId,
         environment: process.env.NODE_ENV,
-        message: socialAccountError.message,
+        message: socialAccountError?.message,
         userId: user.id,
         twitterId: profile.id,
         username: profile.username
@@ -251,7 +251,7 @@ router.get('/auth/x/callback', async (req, res) => {
             ${isDevelopment ? `
               <div class="details">
                 <strong>Error:</strong> Unable to save your Twitter account connection.<br>
-                <strong>Details:</strong> ${socialAccountError.message}<br>
+                <strong>Details:</strong> ${socialAccountError?.message || 'Unknown error'}<br>
                 <strong>User ID:</strong> ${user.id}<br>
                 <strong>Twitter ID:</strong> ${profile.id}<br>
                 <strong>Error ID:</strong> ${errorId}
