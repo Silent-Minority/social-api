@@ -58,7 +58,10 @@ router.get('/auth/x/callback', async (req, res) => {
     state, 
     hasError: !!error,
     queryParams: Object.keys(req.query),
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    userAgent: req.headers['user-agent']?.substring(0, 100),
+    cookies: Object.keys(req.cookies || {}),
+    signedCookies: Object.keys(req.signedCookies || {})
   });
   
   try {
