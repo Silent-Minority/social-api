@@ -485,7 +485,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/user", userRoutes);
 
   // Mount post routes
-  app.use("/api/post", postRoutes);
+  app.use("/api/posts", postRoutes);
 
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {

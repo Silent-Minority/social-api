@@ -26,8 +26,6 @@ router.get('/auth/x/start', (req, res) => {
     
     const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge, scopes);
     
-    console.log('🚀 OAuth start - Authorization flow initiated');
-    
     // Direct redirect to Twitter
     res.redirect(authUrl);
   } catch (error) {
@@ -46,23 +44,11 @@ function clearOAuthCookie(res: express.Response, state: string): void {
     sameSite: 'lax',
     domain: process.env.NODE_ENV === 'production' ? '.mirancourt.com' : undefined
   });
-  console.log('🧹 OAuth cookie cleared:', { cookieName, state });
 }
 
 // Handle OAuth callback
 router.get('/auth/x/callback', async (req, res) => {
   const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
-  
-  console.log('📞 OAuth callback received:', { 
-    hasCode: !!code, 
-    state, 
-    hasError: !!error,
-    queryParams: Object.keys(req.query),
-    timestamp: new Date().toISOString(),
-    userAgent: req.headers['user-agent']?.substring(0, 100),
-    cookies: Object.keys(req.cookies || {}),
-    signedCookies: Object.keys(req.signedCookies || {})
-  });
   
   try {
     // Handle OAuth provider errors first
@@ -79,16 +65,8 @@ router.get('/auth/x/callback', async (req, res) => {
       return res.status(400).send('Missing authorization code or state parameter');
     }
 
-    console.log('🔐 Starting PKCE validation for state:', state);
-    
     // Retrieve and validate PKCE data (includes explicit state validation)
     const codeVerifier = retrieveCodeVerifier(state, req, res);
-    
-    console.log('🔑 PKCE validation result:', { 
-      state, 
-      codeVerifierFound: !!codeVerifier,
-      validationPassed: !!codeVerifier
-    });
     
     if (!codeVerifier) {
       console.error('❌ PKCE validation failed:', { 
@@ -108,8 +86,6 @@ router.get('/auth/x/callback', async (req, res) => {
       });
     }
     
-    console.log('✅ PKCE validation successful, proceeding with token exchange');
-
     const clientId = process.env.X_CLIENT_ID!;
     const clientSecret = process.env.X_CLIENT_SECRET!;
     const redirectUri = process.env.X_REDIRECT_URI!;
@@ -123,9 +99,6 @@ router.get('/auth/x/callback', async (req, res) => {
       redirectUri
     );
 
-    // LOG THE FULL TOKEN DATA
-    console.log('🔍 Full tokenData:', tokenData);
-
     // Get user profile
     const profile = await getUserProfile(tokenData.access_token);
     
@@ -133,13 +106,6 @@ router.get('/auth/x/callback', async (req, res) => {
     const expiresAt = tokenData.expires_in 
       ? calculateTokenExpiration(tokenData.expires_in)
       : null;
-    
-    console.log('🔄 Token expiration calculation:', {
-      expiresInSeconds: tokenData.expires_in,
-      expiresAt: expiresAt?.toISOString(),
-      timeUntilExpiry: expiresAt ? `${Math.round((expiresAt.getTime() - Date.now()) / (60 * 1000))} minutes` : 'never',
-      hasRefreshToken: !!tokenData.refresh_token
-    });
     
     // Create or find user
     let user;
@@ -156,27 +122,11 @@ router.get('/auth/x/callback', async (req, res) => {
       throw new Error("Failed to create user account");
     }
 
-    // Store social account tokens with comprehensive error handling
+    // Store social account tokens
     try {
-      console.log('💾 Storing social account tokens:', {
-        userId: user.id,
-        platform: "x",
-        accountId: profile.id,
-        accountUsername: profile.username,
-        hasAccessToken: !!tokenData.access_token,
-        hasRefreshToken: !!tokenData.refresh_token,
-        expiresAt: expiresAt?.toISOString()
-      });
-
       const existingAccount = await storage.getSocialAccountByPlatform(user.id, "x");
       
       if (existingAccount) {
-        console.log('🔄 Updating existing social account:', {
-          accountId: existingAccount.id,
-          previousUsername: existingAccount.accountUsername,
-          newUsername: profile.username
-        });
-
         await storage.updateSocialAccount(existingAccount.id, {
           accessToken: tokenData.access_token,
           refreshToken: tokenData.refresh_token || null,
@@ -185,12 +135,8 @@ router.get('/auth/x/callback', async (req, res) => {
           accountUsername: profile.username,
           isActive: true,
         });
-        
-        console.log('✅ Social account updated successfully');
       } else {
-        console.log('➕ Creating new social account');
-
-        const newAccount = await storage.createSocialAccount({
+        await storage.createSocialAccount({
           userId: user.id,
           platform: "x",
           accountId: profile.id,
@@ -200,12 +146,6 @@ router.get('/auth/x/callback', async (req, res) => {
           tokenExpiresAt: expiresAt,
           scope: tokenData.scope,
           isActive: true,
-        });
-        
-        console.log('✅ Social account created successfully:', {
-          newAccountId: newAccount.id,
-          accountUsername: newAccount.accountUsername,
-          platform: newAccount.platform
         });
       }
     } catch (socialAccountError: any) {
@@ -278,13 +218,6 @@ router.get('/auth/x/callback', async (req, res) => {
         </html>
       `);
     }
-    
-    console.log('✅ OAuth flow completed successfully:', {
-      userId: user.id,
-      username: profile.username,
-      xAccountId: profile.id,
-      tokenExpiry: expiresAt?.toISOString()
-    });
     
     // Clear OAuth cookie on successful completion
     clearOAuthCookie(res, state);

@@ -26,7 +26,15 @@ export async function getValidAccessToken(
 ): Promise<TokenRefreshResult> {
   const { retryCount = 2, backoffMs = 1000 } = options;
 
-  // Get the social account for this user and platform
+  // Check for real Twitter bearer token from environment first
+  if (platform === 'x' && process.env.TWITTER_BEARER_TOKEN) {
+    return {
+      accessToken: process.env.TWITTER_BEARER_TOKEN,
+      isRefreshed: false
+    };
+  }
+
+  // Fallback to database tokens
   const socialAccount = await storage.getSocialAccountByPlatform(userId, platform);
   
   if (!socialAccount) {
@@ -47,7 +55,6 @@ export async function getValidAccessToken(
   const needsRefresh = socialAccount.tokenExpiresAt && socialAccount.tokenExpiresAt <= twoMinutesFromNow;
 
   if (!needsRefresh) {
-    console.log(`Token for ${platform} account ${socialAccount.accountUsername} is still valid`);
     return {
       accessToken: socialAccount.accessToken,
       isRefreshed: false

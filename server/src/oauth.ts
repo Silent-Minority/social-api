@@ -49,12 +49,6 @@ export function generatePKCE(res: Response): { codeVerifier: string; codeChallen
     timestamp: Date.now()
   });
   
-  console.log('🍪 PKCE data stored in signed cookie:', { 
-    state, 
-    cookieSet: true, 
-    signed: true,
-    payload: { hasCodeVerifier: !!cookiePayload.codeVerifier, hasState: !!cookiePayload.state }
-  });
   
   return { codeVerifier, codeChallenge, state };
 }
@@ -63,13 +57,6 @@ export function generatePKCE(res: Response): { codeVerifier: string; codeChallen
 export function retrieveCodeVerifier(state: string, req: Request, res: Response): string | null {
   const cookieName = `oauth_pkce_${state}`;
   
-  console.log('🔍 PKCE retrieval attempt:', { requestedState: state, cookieName });
-  console.log('🍪 Available cookies debug:', {
-    allCookies: Object.keys(req.cookies || {}),
-    allSignedCookies: Object.keys(req.signedCookies || {}),
-    cookieSecret: !!process.env.COOKIE_SECRET,
-    targetCookie: req.signedCookies[cookieName]
-  });
   
   // First try to get from signed cookie (persistent across restarts)
   const cookieValue = req.signedCookies[cookieName];
@@ -80,23 +67,9 @@ export function retrieveCodeVerifier(state: string, req: Request, res: Response)
       const now = Date.now();
       const twentyMinutes = 20 * 60 * 1000;
       
-      console.log('🔎 Cookie data validation:', {
-        hasCodeVerifier: !!data.codeVerifier,
-        hasState: !!data.state,
-        cookieState: data.state,
-        requestedState: state,
-        stateMatches: data.state === state,
-        timestampValid: (now - data.timestamp) < twentyMinutes,
-        ageMinutes: Math.round((now - data.timestamp) / (60 * 1000))
-      });
       
       // Explicit state validation - critical security check
       if (data.state !== state) {
-        console.warn('⚠️ State mismatch detected!', { 
-          expected: state, 
-          received: data.state,
-          securityBreach: true 
-        });
         clearSecureCookie(res, cookieName);
         return null;
       }
@@ -104,39 +77,25 @@ export function retrieveCodeVerifier(state: string, req: Request, res: Response)
       if (data.codeVerifier && (now - data.timestamp) < twentyMinutes) {
         // Clear the cookie with matching options
         clearSecureCookie(res, cookieName);
-        console.log('✅ PKCE retrieved and validated from signed cookie:', { 
-          state, 
-          found: true, 
-          stateValidated: true 
-        });
         return data.codeVerifier;
       }
       
       // Cookie expired
-      console.warn('⏰ PKCE cookie expired:', { state, ageMinutes: Math.round((now - data.timestamp) / (60 * 1000)) });
       clearSecureCookie(res, cookieName);
       
     } catch (error) {
-      console.error('❌ Signed cookie parse error:', error);
       clearSecureCookie(res, cookieName);
     }
   }
   
   // Fallback to in-memory store (but still validate state)
   const memData = pkceStore.get(state);
-  console.log('🗂️  PKCE Store fallback lookup:', { 
-    signedCookieFound: !!cookieValue,
-    memoryFound: !!memData, 
-    storeSize: pkceStore.size
-  });
   
   if (memData) {
     pkceStore.delete(state);
-    console.log('🔄 PKCE retrieved from memory fallback:', { state, found: true });
     return memData.codeVerifier;
   }
   
-  console.log('❌ PKCE not found in cookie or memory:', { state });
   return null;
 }
 
