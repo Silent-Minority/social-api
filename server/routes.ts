@@ -485,52 +485,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/user", userRoutes);
 
   // POST /api/posts
-  // Create a tweet via Twitter API and return { id, text } for Airtable
   app.post('/api/posts', async (req, res) => {
-    const { content, text, accountId } = req.body;
-    const inputText = content || text; // Accept either { content } or { text } in the body
-
-    if (!inputText) {
-      return res.status(400).json({ error: 'Missing tweet text (provide "content" or "text" field)' });
-    }
-
     try {
-      // Use existing token system instead of accounts object
-      const accessToken = await getValidAccessToken(accountId || 'default');
+      const { text } = req.body;
+      const accessToken = await getValidAccessToken('default', 'x'); // use your helper
 
-      // Guard against app-only tokens for write operations
-      if (accessToken === process.env.TWITTER_BEARER_TOKEN) {
-        return res.status(400).json({ 
-          error: 'Cannot post tweets with application-only token. Please connect your X account via /auth/x/start'
-        });
-      }
-
-      const tweetResp: Response = await fetch('https://api.twitter.com/2/tweets', {
+      const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ text: inputText }),
+        body: JSON.stringify({ text }),
       });
 
-      const result: any = await tweetResp.json();
-
-      if (!tweetResp.ok) {
-        return res.status(tweetResp.status).json({ 
-          error: 'Failed to post tweet',
-          details: result 
-        });
-      }
-
-      const tweetId: string = result.data?.id;
-      const returnedText: string = result.data?.text;
-
-      // Airtable expects exactly { id, text }
-      return res.json({ id: tweetId, text: returnedText });
+      const result = await tweetResp.json();
+      return res.json({ id: result.data?.id, text: result.data?.text });
     } catch (err) {
       console.error('Posting error', err);
-      return res.status(500).json({ error: 'Failed to post tweet', details: err.message });
+      return res.status(500).json({ error: 'Failed to post tweet' });
     }
   });
 
