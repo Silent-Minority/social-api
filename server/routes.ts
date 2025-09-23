@@ -484,7 +484,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount user routes
   app.use("/api/user", userRoutes);
 
-  // Mount post routes
+  // POST /api/posts
+  // Create a tweet via Twitter API and return { id, text } for Airtable
+  app.post('/api/posts', async (req, res) => {
+    const { content, text, accountId } = req.body;
+    const inputText = content || text; // Accept either { content } or { text } in the body
+
+    if (!inputText) {
+      return res.status(400).json({ error: 'No access token found for this account' });
+    }
+
+    try {
+      // Use existing token system instead of accounts object
+      const accessToken = await getValidAccessToken(accountId || 'default');
+
+      const tweetResp: Response = await fetch('https://api.twitter.com/2/tweets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ text: inputText }),
+      });
+
+      const result: any = await tweetResp.json();
+      const tweetId: string = result.data?.id;
+      const returnedText: string = result.data?.text;
+
+      // Airtable expects exactly { id, text }
+      return res.json({ id: tweetId, text: returnedText });
+    } catch (err) {
+      console.error('Posting error', err);
+      return res.status(500).json({ error: 'Failed to post tweet' });
+    }
+  });
+
+  // Mount post routes (for other endpoints like GET)
   app.use("/api/posts", postRoutes);
 
   // POST /api/posts/airtable
