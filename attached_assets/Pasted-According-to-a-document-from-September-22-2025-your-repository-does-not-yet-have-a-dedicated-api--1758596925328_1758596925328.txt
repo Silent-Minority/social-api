@@ -1,0 +1,56 @@
+According to a document from September 22, 2025, your repository does not yet have a dedicated /api/posts route. What’s currently implemented is only the /api/post handler, which publishes a tweet and returns a JSON payload shaped like:
+
+return res.json({
+  status: 'posted',
+  postUrl: tweetId ? `https://twitter.com/user/status/${tweetId}` : null
+});
+
+
+OAuth fixes: implement Twitter …
+
+That explains why Airtable is choking — it’s expecting { id, text }, but the backend is still sending { status, postUrl }.
+
+What to do
+
+To make Airtable happy, you need to add a new handler in server.js or server/routes.ts (just before app.listen(...)) like this:
+
+// POST /api/posts
+// Returns { id, text } for Airtable
+app.post('/api/posts', async (req, res) => {
+  const { content, text, accountId } = req.body;
+  const key = accountId || 'default';
+  const account = accounts[key];
+
+  if (!account || !account.access_token) {
+    return res.status(400).json({ error: 'No access token found for this account' });
+  }
+
+  try {
+    const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${account.access_token}`,
+      },
+      body: JSON.stringify({ text: text || content }),
+    });
+
+    const result = await tweetResp.json();
+    return res.json({ id: result.data?.id, text: result.data?.text });
+  } catch (err) {
+    console.error('Posting error', err);
+    return res.status(500).json({ error: 'Failed to post tweet' });
+  }
+});
+
+Next Steps
+
+Add this code to your backend file (server.js or server/routes.ts).
+
+Commit and push the change, then redeploy/restart the server (Replit or wherever it’s running).
+
+Update your Airtable Run Script to call https://api.mirancourt.com/api/posts (plural).
+
+Test with curl or Airtable again — this time the response will be exactly { id, text }.
+
+This way you keep the old /api/post route for backward compatibility, while Airtable uses the new /api/posts route with the exact shape it needs.
