@@ -491,12 +491,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const inputText = content || text; // Accept either { content } or { text } in the body
 
     if (!inputText) {
-      return res.status(400).json({ error: 'No access token found for this account' });
+      return res.status(400).json({ error: 'Missing tweet text (provide "content" or "text" field)' });
     }
 
     try {
       // Use existing token system instead of accounts object
       const accessToken = await getValidAccessToken(accountId || 'default');
+
+      // Guard against app-only tokens for write operations
+      if (accessToken === process.env.TWITTER_BEARER_TOKEN) {
+        return res.status(400).json({ 
+          error: 'Cannot post tweets with application-only token. Please connect your X account via /auth/x/start'
+        });
+      }
 
       const tweetResp: Response = await fetch('https://api.twitter.com/2/tweets', {
         method: 'POST',
@@ -508,6 +515,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const result: any = await tweetResp.json();
+
+      if (!tweetResp.ok) {
+        return res.status(tweetResp.status).json({ 
+          error: 'Failed to post tweet',
+          details: result 
+        });
+      }
+
       const tweetId: string = result.data?.id;
       const returnedText: string = result.data?.text;
 
@@ -515,7 +530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ id: tweetId, text: returnedText });
     } catch (err) {
       console.error('Posting error', err);
-      return res.status(500).json({ error: 'Failed to post tweet' });
+      return res.status(500).json({ error: 'Failed to post tweet', details: err.message });
     }
   });
 

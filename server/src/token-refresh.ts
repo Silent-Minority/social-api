@@ -26,18 +26,18 @@ export async function getValidAccessToken(
 ): Promise<TokenRefreshResult> {
   const { retryCount = 2, backoffMs = 1000 } = options;
 
-  // Check for real Twitter bearer token from environment first
-  if (platform === 'x' && process.env.TWITTER_BEARER_TOKEN) {
-    return {
-      accessToken: process.env.TWITTER_BEARER_TOKEN,
-      isRefreshed: false
-    };
-  }
-
-  // Fallback to database tokens
+  // First try to get user's OAuth tokens from database
   const socialAccount = await storage.getSocialAccountByPlatform(userId, platform);
   
   if (!socialAccount) {
+    // Only fallback to environment bearer token if no user account exists
+    // This is for read-only operations when no user is connected
+    if (platform === 'x' && process.env.TWITTER_BEARER_TOKEN) {
+      return {
+        accessToken: process.env.TWITTER_BEARER_TOKEN,
+        isRefreshed: false
+      };
+    }
     throw new Error(`No ${platform} account found for user ${userId}`);
   }
 
