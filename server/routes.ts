@@ -487,6 +487,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount post routes
   app.use("/api/posts", postRoutes);
 
+  // POST /api/posts/airtable
+  // Create a tweet via Twitter API and return id and text for Airtable
+  app.post('/api/posts/airtable', async (req, res) => {
+    const { content, text, accountId } = req.body;
+    const tweetText = content || text; // Support both 'content' and 'text' fields
+
+    if (!tweetText) {
+      return res.status(400).json({ error: 'Missing tweet text (provide "content" or "text" field)' });
+    }
+
+    try {
+      // Use existing token system instead of accounts object
+      const accessToken = await getValidAccessToken(accountId || 'default');
+
+      const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ text: tweetText }),
+      });
+
+      const result = await tweetResp.json();
+
+      if (!tweetResp.ok) {
+        return res.status(tweetResp.status).json({ 
+          error: 'Failed to post tweet',
+          details: result 
+        });
+      }
+
+      const tweetId = result.data?.id;
+      const returnedText = result.data?.text;
+
+      // Airtable expects { id, text }
+      return res.json({ id: tweetId, text: returnedText });
+    } catch (err: any) {
+      console.error('Posting error', err);
+      if (err.message.includes('No connected X account')) {
+        return res.status(400).json({ error: 'No access token found for this account' });
+      }
+      return res.status(500).json({ error: 'Failed to post tweet' });
+    }
+  });
+
   // Test endpoint for API verification
   app.get("/api/test", (req, res) => {
     res.json({ 
