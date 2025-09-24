@@ -488,22 +488,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/posts', async (req, res) => {
     try {
       const { text } = req.body;
-      const accessToken = await getValidAccessToken('default', 'x'); // use your helper
+      const accessToken = await getValidAccessToken('default'); // only one arg
 
-      const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
-        method: 'POST',
+      const tweetResp = await fetch("https://api.x.com/2/tweets", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text })
       });
 
       const result = await tweetResp.json();
-      return res.json({ id: result.data?.id, text: result.data?.text });
+
+      if (result.data?.id) {
+        const tweetUrl = `https://twitter.com/MiranCourt/status/${result.data.id}`;
+        return res.json({ id: result.data.id, url: tweetUrl });
+      } else {
+        return res.status(500).json({ error: result });
+      }
     } catch (err) {
-      console.error('Posting error', err);
-      return res.status(500).json({ error: 'Failed to post tweet' });
+      console.error("Posting error", err);
+      return res.status(500).json({ error: "Failed to post tweet" });
     }
   });
 
