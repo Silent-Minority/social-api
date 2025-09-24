@@ -522,10 +522,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const tweetId = result.data?.id;
-      const returnedText = result.data?.text;
+      
+      // Get the username for the URL - need to fetch account info to construct the Twitter URL
+      const allAccounts = await storage.getSocialAccounts();
+      const xAccounts = allAccounts.filter((acc: any) => 
+        (acc.platform === "x" || acc.platform === "twitter") && 
+        acc.isActive && 
+        (acc.accessToken || acc.refreshToken)
+      );
+      
+      if (xAccounts.length === 0) {
+        return res.status(400).json({ 
+          error: "No connected X account found for URL generation"
+        });
+      }
+      
+      // Use the most recently connected X account
+      const socialAccount = xAccounts.sort((a: any, b: any) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+      
+      if (!socialAccount.accountUsername) {
+        return res.status(500).json({
+          error: "Account configuration error",
+          message: "No username stored for connected account"
+        });
+      }
 
-      // Airtable expects { id, text }
-      return res.json({ id: tweetId, text: returnedText });
+      // Airtable expects { id, url }
+      return res.json({ 
+        id: tweetId, 
+        url: `https://twitter.com/${socialAccount.accountUsername}/status/${tweetId}` 
+      });
     } catch (err: any) {
       console.error('Posting error', err);
       if (err.message.includes('No connected X account')) {
