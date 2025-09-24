@@ -7,6 +7,7 @@ import { getValidAccessToken as getValidAccessTokenInternal } from "./src/token-
 import * as xService from "./services/x";
 import userRoutes from "./routes/userRoutes";
 import postRoutes from "./routes/postRoutes";
+import { insertManualTokens, testPostTweet } from "./manual-token-setup";
 
 // Simplified wrapper for getting valid access token from default X account
 async function getValidAccessToken(accountType: string): Promise<string> {
@@ -484,36 +485,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mount user routes
   app.use("/api/user", userRoutes);
 
-  // POST /api/posts
-  app.post('/api/posts', async (req, res) => {
-    try {
-      const { text } = req.body;
-      const accessToken = await getValidAccessToken('default'); // only one arg
-
-      const tweetResp = await fetch("https://api.x.com/2/tweets", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({ text })
-      });
-
-      const result = await tweetResp.json();
-
-      if (result.data?.id) {
-        const tweetUrl = `https://twitter.com/MiranCourt/status/${result.data.id}`;
-        return res.json({ id: result.data.id, url: tweetUrl });
-      } else {
-        return res.status(500).json({ error: result });
-      }
-    } catch (err) {
-      console.error("Posting error", err);
-      return res.status(500).json({ error: "Failed to post tweet" });
-    }
-  });
-
-  // Mount post routes (for other endpoints like GET)
+  // Mount post routes - includes POST /api/posts handler from controller
+  // ✅ FIXED: Removed duplicate inline POST handler to prevent conflicts
   app.use("/api/posts", postRoutes);
 
   // POST /api/posts/airtable
@@ -587,6 +560,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
     });
+  });
+
+  // 🔒 SECURITY: Admin middleware for temporary endpoints
+  const adminAuthMiddleware = (req: any, res: any, next: any) => {
+    const adminToken = process.env.ADMIN_TOKEN;
+    
+    if (!adminToken) {
+      return res.status(500).json({
+        error: "Server configuration error",
+        message: "ADMIN_TOKEN environment variable not configured"
+      });
+    }
+    
+    const providedToken = req.headers['x-admin-token'] || req.body.admin_token;
+    
+    if (!providedToken) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "ADMIN_TOKEN required in X-Admin-Token header or admin_token body field"
+      });
+    }
+    
+    if (providedToken !== adminToken) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "Invalid ADMIN_TOKEN"
+      });
+    }
+    
+    next();
+  };
+
+  // TEMPORARY: Manual token insertion endpoint for troubleshooting OAuth callback issues
+  // 🔒 SECURED: Requires ADMIN_TOKEN for access
+  // This allows manual insertion of OAuth tokens when callbacks aren't reaching the server
+  app.post("/api/admin/insert-tokens", adminAuthMiddleware, async (req, res) => {
+    try {
+      const { access_token, refresh_token, expires_in, scope, twitter_user_id, twitter_username } = req.body;
+      
+      if (!access_token || !twitter_user_id || !twitter_username) {
+        return res.status(400).json({
+          error: "Missing required fields",
+          required: ["access_token", "twitter_user_id", "twitter_username"]
+        });
+      }
+
+      // 🔒 VALIDATION: Validate token before persisting to avoid bad state
+      try {
+        const { TwitterOAuth } = await import("./oauth");
+        const profile = await TwitterOAuth.getUserProfile(access_token);
+        
+        // Verify the token belongs to the expected user
+        if (profile.id !== twitter_user_id || profile.username !== twitter_username) {
+          return res.status(400).json({
+            error: "Token validation failed",
+            message: "Access token does not match provided user ID or username",
+            expected: { id: twitter_user_id, username: twitter_username },
+            actual: { id: profile.id, username: profile.username }
+          });
+        }
+      } catch (validationError) {
+        return res.status(400).json({
+          error: "Invalid access token",
+          message: "Token validation failed - token may be expired or invalid",
+          details: validationError instanceof Error ? validationError.message : String(validationError)
+        });
+      }
+      
+      await insertManualTokens({
+        access_token,
+        refresh_token,
+        expires_in,
+        scope,
+        twitter_user_id,
+        twitter_username
+      });
+      
+      res.json({ 
+        success: true, 
+        message: `Successfully inserted and validated tokens for @${twitter_username}`,
+        tokenValidated: true
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        error: "Failed to insert tokens",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  // TEMPORARY: Test tweet endpoint for verifying the setup works
+  // 🔒 SECURED: Requires ADMIN_TOKEN for access
+  app.post("/api/admin/test-tweet", adminAuthMiddleware, async (req, res) => {
+    try {
+      const { text = "Test tweet from manual token setup 🚀" } = req.body;
+      
+      const result = await testPostTweet(text);
+      
+      res.json({ 
+        success: true, 
+        message: "Test tweet posted successfully! Check the console for details.",
+        tweetDetails: result
+      });
+    } catch (error) {
+      res.status(500).json({ 
+        error: "Test tweet failed",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
   });
 
   const httpServer = createServer(app);

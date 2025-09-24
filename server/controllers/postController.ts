@@ -40,17 +40,20 @@ export async function postTweet(req: any, res: any, next: any) {
       error: null
     });
 
-    // Return enriched response with local post data and X API response
-    return res.status(201).json({
-      id: post.id,
-      userId: post.userId,
-      content: post.content,
-      platform: post.platform,
-      platformPostId: post.platformPostId,
-      status: post.status,
-      error: post.error,
-      createdAt: post.createdAt,
-      tweet: data.data // Original X API response
+    // Return response in expected format: {"id": "tweet_id", "url": "https://twitter.com/username/status/tweet_id"}
+    const tweetId = data.data?.id;
+    // ✅ FIXED: Use stored accountUsername without hardcoded fallback to avoid security risk
+    if (!account.accountUsername) {
+      return res.status(500).json({
+        error: "Account configuration error",
+        message: "No username stored for connected account"
+      });
+    }
+    const username = account.accountUsername;
+    
+    return res.status(200).json({
+      id: tweetId,
+      url: `https://twitter.com/${username}/status/${tweetId}`
     });
   } catch (err: any) {
     if (err.message.includes("No connected X account")) {
