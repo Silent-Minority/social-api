@@ -26,7 +26,7 @@ Since our callback handler can't process the code, you need to exchange it manua
 
 ```bash
 # Exchange the authorization code for tokens
-curl -X POST "https://api.twitter.com/2/oauth2/token" \
+curl -X POST "https://api.x.com/2/oauth2/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "Authorization: Basic $(echo -n 'YOUR_CLIENT_ID:YOUR_CLIENT_SECRET' | base64)" \
   -d "grant_type=authorization_code" \

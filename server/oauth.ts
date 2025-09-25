@@ -4,8 +4,8 @@ import { storage } from "./storage";
 // OAuth 2.0 PKCE utilities for X (Twitter) API
 export class TwitterOAuth {
   private static readonly TWITTER_OAUTH_URL = "https://twitter.com/i/oauth2/authorize";
-  private static readonly TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
-  private static readonly TWITTER_API_BASE = "https://api.twitter.com";
+  private static readonly TWITTER_TOKEN_URL = "https://api.x.com/2/oauth2/token";
+  private static readonly TWITTER_API_BASE = "https://api.x.com";
 
   // Generate PKCE code verifier and challenge
   static generatePKCE(): { codeVerifier: string; codeChallenge: string } {

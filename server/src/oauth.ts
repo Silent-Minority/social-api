@@ -154,7 +154,7 @@ export async function exchangeCodeForTokens(
 
   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+  const response = await fetch('https://api.x.com/2/oauth2/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
@@ -177,7 +177,7 @@ export async function getUserProfile(accessToken: string): Promise<{
   username: string;
   name: string;
 }> {
-  const response = await fetch('https://api.twitter.com/2/users/me', {
+  const response = await fetch('https://api.x.com/2/users/me', {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
     },
@@ -211,7 +211,7 @@ export async function refreshAccessToken(
 
   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
-  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
+  const response = await fetch('https://api.x.com/2/oauth2/token', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
