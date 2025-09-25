@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import authRouter from "./src/auth";
+import { redactTokens } from "./utils/security";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,8 @@ if (!process.env.COOKIE_SECRET) {
 
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
+// 🔒 SECURE LOGGING MIDDLEWARE
+// Protects against token/credential exposure in logs while maintaining debugging utility
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -35,12 +38,28 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      
+      // 🔒 SECURITY: Handle response body logging securely
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Check if route is sensitive and should not log response body
+        const isSensitive = path.startsWith('/auth/') || 
+                           path.startsWith('/api/admin/') ||
+                           path.includes('token') ||
+                           path === '/api/social-accounts' ||
+                           path.startsWith('/api/oauth/');
+        
+        if (isSensitive) {
+          // For sensitive routes, only log basic info - NO response body
+          logLine += ` :: [SENSITIVE_ROUTE_BODY_REDACTED]`;
+        } else {
+          // For other routes, redact sensitive data before logging
+          const safeResponse = redactTokens(capturedJsonResponse);
+          logLine += ` :: ${JSON.stringify(safeResponse)}`;
+        }
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      if (logLine.length > 120) {
+        logLine = logLine.slice(0, 119) + "…";
       }
 
       log(logLine);

@@ -22,21 +22,25 @@ interface OAuthValidationReport {
 }
 
 // Mock Express Request/Response for testing
-function createMockRes(): Response {
+function createMockRes(): Response & { signedCookies: Record<string, any> } {
   const cookies: Record<string, any> = {};
   const signedCookies: Record<string, any> = {};
   
-  return {
+  const mockRes = {
     cookie: (name: string, value: string, options?: any) => {
       if (options?.signed) {
         signedCookies[name] = value;
       } else {
         cookies[name] = value;
       }
+      return mockRes; // Return self for method chaining
     },
     clearCookie: () => {},
+    signedCookies,
     // Mock other Response methods as needed
   } as any;
+  
+  return mockRes;
 }
 
 function createMockReq(signedCookies: Record<string, any> = {}): Request {
@@ -347,6 +351,7 @@ export class OAuthValidator {
       // Override cookie method to capture options
       mockRes.cookie = (name: string, value: string, options?: any) => {
         cookieOptions = options;
+        return mockRes; // Return self for method chaining
       };
       
       generatePKCE(mockRes);
@@ -399,7 +404,7 @@ export class OAuthValidator {
     ];
     
     const passed = this.results.filter(r => r.passed).length;
-    const failed = this.results.filter(r => r.failed).length;
+    const failed = this.results.filter(r => !r.passed).length;
     const securityScore = Math.round((passed / this.results.length) * 100);
     
     const recommendations = [
