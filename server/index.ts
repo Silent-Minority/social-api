@@ -75,14 +75,15 @@ app.use((req, res, next) => {
   // Mount the new simplified OAuth routes
   app.use(authRouter);
 
-  // Serve static legal pages
-  app.get('/privacy-policy.html', (_req: Request, res: Response) => {
-    res.sendFile('privacy-policy.html', { root: __dirname });
+  // === Alias routes for legacy paths ===
+  app.get("/auth/x/start", (_req: Request, res: Response) => {
+    res.redirect("/api/auth/twitter");
   });
 
-  app.get('/terms-of-service.html', (_req: Request, res: Response) => {
-    res.sendFile('terms-of-service.html', { root: __dirname });
+  app.get("/auth/x/callback", (_req: Request, res: Response) => {
+    res.redirect("/api/auth/twitter/callback");
   });
+
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
