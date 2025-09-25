@@ -8,6 +8,8 @@ import * as xService from "./services/x";
 import userRoutes from "./routes/userRoutes";
 import postRoutes from "./routes/postRoutes";
 import { insertManualTokens, testPostTweet } from "./manual-token-setup";
+import { postTweet } from "./controllers/postController";
+import { getUserProfile } from "./controllers/userController";
 
 // Simplified wrapper for getting valid access token from default X account
 async function getValidAccessToken(accountType: string): Promise<string> {

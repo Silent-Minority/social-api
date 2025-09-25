@@ -2,12 +2,12 @@ import { resolveAccountAndToken } from "../services/userService.js";
 
 export async function getUserProfile(req: any, res: any, next: any) {
   try {
-    const { account, access } = await resolveAccountAndToken("default");
+    const { userId, accountId, accessToken } = await resolveAccountAndToken("default");
 
-    const url = `https://api.x.com/2/users/${account.accountId}?user.fields=profile_image_url,description,public_metrics`;
+    const url = `https://api.x.com/2/users/${accountId}?user.fields=profile_image_url,description,public_metrics`;
 
     const r = await fetch(url, {
-      headers: { Authorization: `Bearer ${access}` }
+      headers: { Authorization: `Bearer ${accessToken}` }
     });
 
     const data = await r.json().catch(() => ({}));

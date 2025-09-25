@@ -8,12 +8,17 @@ export async function postTweet(req: any, res: any, next: any) {
       return res.status(400).json({ error: "Missing tweet text" });
     }
 
-    const { account, access } = await resolveAccountAndToken("default");
+    const { userId, accountId, accessToken } = await resolveAccountAndToken("default");
+    
+    // Get the full account object for additional data needed
+    const account = await storage.getSocialAccounts().then(accounts => 
+      accounts.find(acc => acc.userId === userId && acc.accountId === accountId)
+    );
 
     const r = await fetch("https://api.x.com/2/tweets", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${access}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ text })
@@ -31,8 +36,8 @@ export async function postTweet(req: any, res: any, next: any) {
 
     // Save successful post to database
     const post = await storage.createPost({
-      userId: account.userId,
-      accountId: account.id, // Link to the specific social account
+      userId: userId,
+      accountId: account?.id || accountId, // Link to the specific social account
       content: text,
       platform: "x",
       platformPostId: data.data?.id,
@@ -43,7 +48,7 @@ export async function postTweet(req: any, res: any, next: any) {
     // Return response in expected format: {"id": "tweet_id", "url": "https://twitter.com/username/status/tweet_id"}
     const tweetId = data.data?.id;
     // ✅ FIXED: Use stored accountUsername without hardcoded fallback to avoid security risk
-    if (!account.accountUsername) {
+    if (!account || !account.accountUsername) {
       return res.status(500).json({
         error: "Account configuration error",
         message: "No username stored for connected account"
