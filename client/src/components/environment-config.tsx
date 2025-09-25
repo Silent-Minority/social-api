@@ -31,17 +31,17 @@ export function EnvironmentConfig() {
     },
     {
       icon: Key,
-      name: "X_CLIENT_ID",
-      value: config?.xClientId ? "••••••••" : "Missing",
-      status: config?.xClientId ? "configured" : "missing",
-      color: config?.xClientId ? "green" : "red"
+      name: "TWITTER_CLIENT_ID",
+      value: config?.twitterClientId ? "••••••••" : "Missing",
+      status: config?.twitterClientId ? "configured" : "missing",
+      color: config?.twitterClientId ? "green" : "red"
     },
     {
       icon: Lock,
-      name: "X_CLIENT_SECRET",
-      value: config?.xClientSecret ? "••••••••" : "Missing",
-      status: config?.xClientSecret ? "configured" : "missing",
-      color: config?.xClientSecret ? "green" : "red"
+      name: "TWITTER_CLIENT_SECRET",
+      value: config?.twitterClientSecret ? "••••••••" : "Missing",
+      status: config?.twitterClientSecret ? "configured" : "missing",
+      color: config?.twitterClientSecret ? "green" : "red"
     },
     {
       icon: Globe,
@@ -72,7 +72,7 @@ export function EnvironmentConfig() {
     }
   };
 
-  const missingCredentials = !config?.xClientId || !config?.xClientSecret;
+  const missingCredentials = !config?.twitterClientId || !config?.twitterClientSecret;
 
   return (
     <div className="bg-card rounded-lg border border-border">

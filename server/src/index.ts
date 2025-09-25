@@ -62,18 +62,18 @@ app.get('/', (req, res) => {
         
         <h2>🚀 Quick Start</h2>
         <p>Connect your Twitter account to get started:</p>
-        <a href="/auth/x/start" class="button">Connect Twitter Account</a>
+        <a href="/auth/twitter/start" class="button">Connect Twitter Account</a>
         
         <h2>📋 Available Endpoints</h2>
-        <div class="endpoint">GET /auth/x/start - Start Twitter OAuth flow</div>
-        <div class="endpoint">GET /auth/x/callback - OAuth callback handler</div>
+        <div class="endpoint">GET /auth/twitter/start - Start Twitter OAuth flow</div>
+        <div class="endpoint">GET /auth/twitter/callback - OAuth callback handler</div>
         <div class="endpoint">GET /health - Server health check</div>
         
         <h2>🔧 Environment Setup</h2>
         <p>Required Replit Secrets:</p>
         <ul>
-          <li><code>X_CLIENT_ID</code> - Your Twitter App Client ID</li>
-          <li><code>X_CLIENT_SECRET</code> - Your Twitter App Client Secret</li>
+          <li><code>TWITTER_CLIENT_ID</code> - Your Twitter App Client ID</li>
+          <li><code>TWITTER_CLIENT_SECRET</code> - Your Twitter App Client Secret</li>
           <li><code>DATABASE_URL</code> - PostgreSQL connection string</li>
         </ul>
       </body>

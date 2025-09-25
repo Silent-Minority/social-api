@@ -2,15 +2,15 @@ import crypto from "crypto";
 import { getDb } from "./db";
 
 const {
-  X_CLIENT_ID,
-  X_CLIENT_SECRET,
-  X_REDIRECT_URI,
-  X_SCOPES,
+  TWITTER_CLIENT_ID,
+  TWITTER_CLIENT_SECRET,
+  TWITTER_REDIRECT_URI,
+  TWITTER_SCOPES,
   JWT_SECRET
 } = process.env;
 
-if (!X_CLIENT_ID || !X_REDIRECT_URI || !X_SCOPES || !JWT_SECRET) {
-  throw new Error("Missing required environment variables: X_CLIENT_ID, X_REDIRECT_URI, X_SCOPES, JWT_SECRET");
+if (!TWITTER_CLIENT_ID || !TWITTER_REDIRECT_URI || !TWITTER_SCOPES || !JWT_SECRET) {
+  throw new Error("Missing required environment variables: TWITTER_CLIENT_ID, TWITTER_REDIRECT_URI, TWITTER_SCOPES, JWT_SECRET");
 }
 
 const HOST = "https://api.x.com";
@@ -91,11 +91,11 @@ export async function ensureFreshAccessToken(row?: any): Promise<string | null> 
   const params = new URLSearchParams({
     grant_type: "refresh_token",
     refresh_token: row.refresh_token,
-    client_id: X_CLIENT_ID!
+    client_id: TWITTER_CLIENT_ID!
   });
 
   // Uncomment the next line if your app requires client_secret for refresh:
-  // params.set("client_secret", X_CLIENT_SECRET!);
+  // params.set("client_secret", TWITTER_CLIENT_SECRET!);
 
   const res = await fetch(TOKEN_URL, {
     method: "POST",

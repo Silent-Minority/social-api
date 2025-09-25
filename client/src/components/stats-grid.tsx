@@ -35,11 +35,11 @@ export function StatsGrid({ status, isLoading }: StatsGridProps) {
       testId: "status-requests"
     },
     {
-      title: "X Auth Status",
-      value: config?.xApiKey && config?.xApiSecret ? "Ready" : "Pending",
+      title: "Twitter Auth Status",
+      value: config?.twitterClientId && config?.twitterClientSecret ? "Ready" : "Pending",
       icon: Twitter,
-      color: config?.xApiKey && config?.xApiSecret ? "green" : "yellow",
-      testId: "status-x-auth"
+      color: config?.twitterClientId && config?.twitterClientSecret ? "green" : "yellow",
+      testId: "status-twitter-auth"
     },
   ];
 

@@ -159,8 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const config = {
       port: process.env.PORT || 5000,
       corsOrigin: process.env.CORS_ORIGIN || "*",
-      xClientId: !!process.env.X_CLIENT_ID,
-      xClientSecret: !!process.env.X_CLIENT_SECRET,
+      twitterClientId: !!process.env.TWITTER_CLIENT_ID,
+      twitterClientSecret: !!process.env.TWITTER_CLIENT_SECRET,
       jwtSecret: process.env.JWT_SECRET ? "configured" : "default",
     };
     res.json(config);

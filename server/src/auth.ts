@@ -6,20 +6,20 @@ import { storage } from '../storage';
 const router = express.Router();
 
 // Start OAuth flow - redirect to Twitter
-router.get('/auth/x/start', (req, res) => {
+router.get('/auth/twitter/start', (req, res) => {
   try {
-    const clientId = process.env.X_CLIENT_ID;
-    const clientSecret = process.env.X_CLIENT_SECRET;
+    const clientId = process.env.TWITTER_CLIENT_ID;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET;
     
     if (!clientId || !clientSecret) {
-      return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in Replit Secrets.');
+      return res.status(500).send('Twitter API credentials not configured. Please set TWITTER_CLIENT_ID and TWITTER_CLIENT_SECRET in Replit Secrets.');
     }
 
-    const redirectUri = process.env.X_REDIRECT_URI;
-    const scopes = process.env.X_SCOPES;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI;
+    const scopes = process.env.TWITTER_SCOPES;
     
     if (!redirectUri || !scopes) {
-      return res.status(500).send('OAuth configuration not complete. Please set X_REDIRECT_URI and X_SCOPES in Replit Secrets.');
+      return res.status(500).send('OAuth configuration not complete. Please set TWITTER_REDIRECT_URI and TWITTER_SCOPES in Replit Secrets.');
     }
 
     const { codeChallenge, state } = generatePKCE(res);
@@ -47,7 +47,7 @@ function clearOAuthCookie(res: express.Response, state: string): void {
 }
 
 // Handle OAuth callback
-router.get('/auth/x/callback', async (req, res) => {
+router.get('/auth/twitter/callback', async (req, res) => {
   const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
   
   try {
@@ -86,9 +86,9 @@ router.get('/auth/x/callback', async (req, res) => {
       });
     }
     
-    const clientId = process.env.X_CLIENT_ID!;
-    const clientSecret = process.env.X_CLIENT_SECRET!;
-    const redirectUri = process.env.X_REDIRECT_URI!;
+    const clientId = process.env.TWITTER_CLIENT_ID!;
+    const clientSecret = process.env.TWITTER_CLIENT_SECRET!;
+    const redirectUri = process.env.TWITTER_REDIRECT_URI!;
     
     // Exchange code for tokens
     const tokenData = await exchangeCodeForTokens(
