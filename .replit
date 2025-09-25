@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "web", "postgresql-16"]
-run = "npm run dev"
+run = "npx tsx server/index.ts"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["sh", "-c", "node server.js"]
+run = ["sh", "-c", "npx tsx server/index.ts"]
 
 [[ports]]
 localPort = 5000
@@ -50,7 +50,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "npx tsx server/index.ts"
 waitForPort = 5000
 
 [agent]
