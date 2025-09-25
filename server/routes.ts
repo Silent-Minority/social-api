@@ -135,6 +135,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (userError: any) {
         // If no users exist yet, that's fine - just return empty arrays
         console.log("No user data available yet:", userError?.message || userError);
+        // Reset to empty arrays on error to ensure consistent response structure
+        connectedAccounts = [];
       }
       
       res.json({
@@ -169,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const logs = await storage.getRecentLogs(limit);
       res.json(logs);
     } catch (error) {
+      console.error("Failed to fetch logs:", error);
       res.status(500).json({ error: "Failed to get logs" });
     }
   });
@@ -182,6 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const posts = await storage.getPostsByUser(userId);
       res.json(posts);
     } catch (error) {
+      console.error("Failed to fetch posts for user:", req.params.userId, error);
       res.status(500).json({ error: "Failed to get posts" });
     }
   });

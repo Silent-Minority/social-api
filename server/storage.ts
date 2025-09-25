@@ -8,7 +8,7 @@ import {
   users, socialAccounts, posts, apiLogs, tweetMetrics, oauthStates
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -182,8 +182,12 @@ export class DatabaseStorage implements IStorage {
 
   async getTweetMetricsByPostIds(postIds: string[]): Promise<TweetMetrics[]> {
     if (postIds.length === 0) return [];
+    if (postIds.length === 1) {
+      return await db.select().from(tweetMetrics)
+        .where(eq(tweetMetrics.postId, postIds[0]));
+    }
     return await db.select().from(tweetMetrics)
-      .where(eq(tweetMetrics.postId, postIds[0])); // Simple implementation, can be enhanced
+      .where(inArray(tweetMetrics.postId, postIds));
   }
 
   async getRecentLogs(limit: number = 50): Promise<ApiLog[]> {
