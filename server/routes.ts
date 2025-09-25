@@ -36,6 +36,16 @@ async function getValidAccessToken(accountType: string): Promise<string> {
   return tokenResult.accessToken;
 }
 
+// Flask-compatible function that returns access token or null if no account found
+async function resolveAccountAndToken(accountType: string): Promise<string | null> {
+  try {
+    return await getValidAccessToken(accountType);
+  } catch (error) {
+    // Return null if no account found (Flask behavior)
+    return null;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // CORS middleware
   app.use(cors({
@@ -560,6 +570,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'No access token found for this account' });
       }
       return res.status(500).json({ error: 'Failed to post tweet' });
+    }
+  });
+
+  // POST /api/post
+  // Exact Flask specification endpoint - posts tweet and returns raw Twitter API response
+  app.post('/api/post', async (req, res) => {
+    const data = req.body;
+    
+    // Check if data exists and has 'text' field (exact Flask behavior)
+    if (!data || !('text' in data)) {
+      return res.status(400).json({ error: "No text provided" });
+    }
+    
+    // Get access token using Flask-compatible function
+    const access_token = await resolveAccountAndToken('default');
+    if (!access_token) {
+      return res.status(401).json({ 
+        error: "No connected X account", 
+        suggestion: "/auth/x/start" 
+      });
+    }
+    
+    // Post to Twitter API (exact Flask implementation)
+    const headers = {
+      'Authorization': `Bearer ${access_token}`,
+      'Content-Type': 'application/json'
+    };
+    const payload = { text: data.text };
+    
+    try {
+      const response = await fetch('https://api.twitter.com/2/tweets', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify(payload)
+      });
+
+      // Return raw Twitter response for success (status 201) or error with response text
+      if (response.status === 201) {
+        const result = await response.json();
+        return res.json(result);
+      } else {
+        const errorText = await response.text();
+        return res.status(response.status).json({ error: errorText });
+      }
+    } catch (err: any) {
+      // Handle fetch errors
+      return res.status(500).json({ error: err.message || 'Request failed' });
     }
   });
 
