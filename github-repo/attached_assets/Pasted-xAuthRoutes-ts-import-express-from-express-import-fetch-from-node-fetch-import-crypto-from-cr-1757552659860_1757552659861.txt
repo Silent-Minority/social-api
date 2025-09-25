@@ -1,0 +1,94 @@
+xAuthRoutes.ts
+import express from "express";
+import fetch from "node-fetch";
+import crypto from "crypto";
+
+const router = express.Router();
+
+// Generate PKCE code verifier + challenge
+function generatePKCE() {
+  const verifier = crypto.randomBytes(32).toString("base64url");
+  const challenge = crypto
+    .createHash("sha256")
+    .update(verifier)
+    .digest("base64url");
+  return { verifier, challenge };
+}
+
+// Store verifiers in memory (swap for DB if needed)
+const pkceStore: Record<string, string> = {};
+
+// Step 1: Start OAuth flow
+router.get("/auth/x/start", (req, res) => {
+  const state = crypto.randomBytes(16).toString("hex");
+  const { verifier, challenge } = generatePKCE();
+  pkceStore[state] = verifier;
+
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: process.env.X_CLIENT_ID!,
+    redirect_uri: "https://api.mirancourt.com/auth/x/callback",
+    scope: "tweet.read tweet.write users.read offline.access",
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+  });
+
+  res.redirect(`https://twitter.com/i/oauth2/authorize?${params.toString()}`);
+});
+
+// Step 2: Handle callback
+router.get("/auth/x/callback", async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code || !state) {
+    return res.status(400).send("Missing code or state");
+  }
+
+  const verifier = pkceStore[state as string];
+  if (!verifier) {
+    return res.status(400).send("Invalid or expired state");
+  }
+
+  try {
+    const tokenResponse = await fetch("https://api.twitter.com/2/oauth2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: code as string,
+        grant_type: "authorization_code",
+        client_id: process.env.X_CLIENT_ID!,
+        client_secret: process.env.X_CLIENT_SECRET!,
+        redirect_uri: "https://api.mirancourt.com/auth/x/callback",
+        code_verifier: verifier,
+      }),
+    });
+
+    const data = await tokenResponse.json();
+    console.log("OAuth Token Response:", data);
+
+    // ⚡ Replace this with saving tokens to DB/session
+    res.send("Twitter connected successfully! Check server logs for token data.");
+  } catch (err) {
+    console.error("OAuth error:", err);
+    res.status(500).send("OAuth callback failed");
+  }
+});
+
+export default router;
+
+How to wire it in
+
+Save this as xAuthRoutes.ts in your project.
+
+In your index.ts (or main server file):
+
+import express from "express";
+import xAuthRoutes from "./xAuthRoutes";
+
+const app = express();
+app.use(xAuthRoutes);
+
+app.listen(5000, () => {
+  console.log("Server running on http://localhost:5000");
+});
