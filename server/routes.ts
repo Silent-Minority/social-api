@@ -76,6 +76,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   });
 
+  // OAuth debug endpoint
+  app.get("/api/oauth/debug", (req, res) => {
+    res.json({
+      hasClientId: !!process.env.X_CLIENT_ID,
+      hasClientSecret: !!process.env.X_CLIENT_SECRET,
+      hasRedirectUri: !!process.env.X_REDIRECT_URI,
+      hasScopes: !!process.env.X_SCOPES,
+      environment: process.env.NODE_ENV,
+      port: process.env.PORT
+    });
+  });
+
   // Compatibility alias for legacy dashboard calls
   // Some clients call /api/auth/twitter; redirect them to the current OAuth start route
   app.get('/api/auth/twitter', (_req, res) => {
