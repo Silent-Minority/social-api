@@ -11,7 +11,19 @@ router.get('/auth/x/start', (req, res) => {
     const clientId = process.env.X_CLIENT_ID;
     const clientSecret = process.env.X_CLIENT_SECRET;
     
+    // Debug-safe env presence log (no secrets)
+    console.log('OAuth start env check', {
+      hasClientId: !!clientId,
+      hasClientSecret: !!clientSecret,
+      hasRedirectUri: !!process.env.X_REDIRECT_URI,
+      hasScopes: !!process.env.X_SCOPES
+    });
+
     if (!clientId || !clientSecret) {
+      console.error('OAuth start missing credentials', {
+        hasClientId: !!clientId,
+        hasClientSecret: !!clientSecret
+      });
       return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in environment variables.');
     }
 
@@ -19,6 +31,10 @@ router.get('/auth/x/start', (req, res) => {
     const scopes = process.env.X_SCOPES;
     
     if (!redirectUri || !scopes) {
+      console.error('OAuth start missing config', {
+        hasRedirectUri: !!redirectUri,
+        hasScopes: !!scopes
+      });
       return res.status(500).send('OAuth configuration not complete. Please set X_REDIRECT_URI and X_SCOPES.');
     }
 
