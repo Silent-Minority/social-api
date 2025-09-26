@@ -1,6 +1,38 @@
-node_modules
-dist
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.esbuild/
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Replit state
+.replit
+.local/
+.config/
+
+# Editor cruft
+.vscode/
+.idea/
 .DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+Thumbs.db
+
+# Misc
+coverage/

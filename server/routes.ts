@@ -519,7 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use existing token system instead of accounts object
       const accessToken = await getValidAccessToken(accountId || 'default');
 
-      const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
+      const tweetResp = await fetch('https://api.x.com/2/tweets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -606,7 +606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const payload = { text: data.text };
     
     try {
-      const response = await fetch('https://api.twitter.com/2/tweets', {
+      const response = await fetch('https://api.x.com/2/tweets', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)
