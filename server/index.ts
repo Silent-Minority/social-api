@@ -75,14 +75,10 @@ app.use((req, res, next) => {
   // Mount the new simplified OAuth routes
   app.use(authRouter);
 
-  // === Alias routes for legacy paths ===
-  app.get("/auth/x/start", (_req: Request, res: Response) => {
-    res.redirect("/api/auth/twitter");
-  });
-
-  app.get("/auth/x/callback", (_req: Request, res: Response) => {
-    res.redirect("/api/auth/twitter/callback");
-  });
+  // Note: Do NOT add reverse redirects here.
+  // We already expose canonical OAuth routes at /auth/x/* and provide
+  // a legacy alias in routes.ts from /api/auth/twitter -> /auth/x/start.
+  // Adding reverse redirects here would create an infinite loop.
 
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
