@@ -5,8 +5,17 @@ import { storage } from '../storage';
 
 const router = express.Router();
 
+// Legacy aliases retained for backwards compatibility
+router.get('/auth/twitter/start', (_req, res) => {
+  res.redirect('/auth/x/start');
+});
+
+router.get('/auth/twitter/callback', (_req, res) => {
+  res.redirect('/auth/x/callback');
+});
+
 // Start OAuth flow - redirect to Twitter/X
-router.get('/auth/x/start', (req, res) => {
+router.get('/auth/x/start', async (req, res) => {
   try {
     const clientId = process.env.X_CLIENT_ID;
     const clientSecret = process.env.X_CLIENT_SECRET;
