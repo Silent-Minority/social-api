@@ -108,11 +108,22 @@ router.get('/auth/x/callback', async (req, res) => {
     let codeVerifier = retrieveCodeVerifier(state, req, res);
     
     if (!codeVerifier) {
-      // Fallback: check server-side state storage (in case cookies were dropped)
+      console.warn('PKCE fallback: cookie missing for state', state);
       try {
         const dbState = await storage.getOauthState(state);
+        if (dbState) {
+          console.log('PKCE fallback: DB state found', {
+            state: dbState.state,
+            expiresAt: dbState.expiresAt
+          });
+        }
         if (dbState && dbState.expiresAt && new Date(dbState.expiresAt) > new Date()) {
           codeVerifier = dbState.codeVerifier as unknown as string;
+        } else {
+          console.warn('PKCE fallback: DB state missing or expired', {
+            hasState: !!dbState,
+            expiresAt: dbState?.expiresAt
+          });
         }
       } catch (dbErr) {
         console.warn('PKCE state DB lookup failed:', (dbErr as Error)?.message);
