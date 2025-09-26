@@ -75,8 +75,8 @@ export async function getValidAccessToken(
   }
 
   // Get OAuth credentials
-  const clientId = process.env.TWITTER_CLIENT_ID;
-  const clientSecret = process.env.TWITTER_CLIENT_SECRET;
+  const clientId = process.env.X_CLIENT_ID;
+  const clientSecret = process.env.X_CLIENT_SECRET;
   
   if (!clientId || !clientSecret) {
     throw new Error('OAuth credentials not configured');

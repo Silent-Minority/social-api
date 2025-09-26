@@ -64,7 +64,7 @@ export async function postTweet(req: any, res: any, next: any) {
     if (err.message.includes("No connected X account")) {
       return res.status(400).json({
         error: "No connected X account found",
-        suggestion: "Connect via /auth/x/start"
+        suggestion: "Connect via /auth/twitter/start"
       });
     }
     return next(err);

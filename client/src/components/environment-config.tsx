@@ -31,14 +31,14 @@ export function EnvironmentConfig() {
     },
     {
       icon: Key,
-      name: "TWITTER_CLIENT_ID",
+      name: "X_CLIENT_ID",
       value: config?.twitterClientId ? "••••••••" : "Missing",
       status: config?.twitterClientId ? "configured" : "missing",
       color: config?.twitterClientId ? "green" : "red"
     },
     {
       icon: Lock,
-      name: "TWITTER_CLIENT_SECRET",
+      name: "X_CLIENT_SECRET",
       value: config?.twitterClientSecret ? "••••••••" : "Missing",
       status: config?.twitterClientSecret ? "configured" : "missing",
       color: config?.twitterClientSecret ? "green" : "red"

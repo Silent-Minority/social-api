@@ -72,8 +72,8 @@ app.get('/', (req, res) => {
         <h2>🔧 Environment Setup</h2>
         <p>Required Replit Secrets:</p>
         <ul>
-          <li><code>TWITTER_CLIENT_ID</code> - Your Twitter App Client ID</li>
-          <li><code>TWITTER_CLIENT_SECRET</code> - Your Twitter App Client Secret</li>
+          <li><code>X_CLIENT_ID</code> - Your Twitter App Client ID</li>
+          <li><code>X_CLIENT_SECRET</code> - Your Twitter App Client Secret</li>
           <li><code>DATABASE_URL</code> - PostgreSQL connection string</li>
         </ul>
       </body>

@@ -33,7 +33,7 @@ export default function Authentication() {
     setIsConnecting(true);
     try {
       // Redirect to Twitter OAuth
-      window.location.href = '/auth/x/start';
+      window.location.href = '/auth/twitter/start';
     } catch (error) {
       console.error('Error connecting to Twitter:', error);
       setIsConnecting(false);
