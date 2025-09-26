@@ -38,7 +38,21 @@ router.get('/auth/x/start', (req, res) => {
       return res.status(500).send('OAuth configuration not complete. Please set X_REDIRECT_URI and X_SCOPES.');
     }
 
-    const { codeChallenge, state } = generatePKCE(res);
+    const { codeVerifier, codeChallenge, state } = generatePKCE(res);
+    
+    // Persist PKCE state server-side as a fallback to cookies (avoids state loss behind proxies)
+    try {
+      const expiresAt = new Date(Date.now() + 20 * 60 * 1000);
+      await storage.createOauthState({
+        state,
+        codeVerifier,
+        platform: 'x',
+        userId: null,
+        expiresAt
+      } as any);
+    } catch (persistErr) {
+      console.warn('PKCE state DB persist failed (continuing with cookie only):', (persistErr as Error)?.message);
+    }
     
     const authUrl = buildAuthUrl(clientId, redirectUri, state, codeChallenge, scopes);
     
@@ -82,8 +96,20 @@ router.get('/auth/x/callback', async (req, res) => {
     }
 
     // Retrieve and validate PKCE data (includes explicit state validation)
-    const codeVerifier = retrieveCodeVerifier(state, req, res);
+    let codeVerifier = retrieveCodeVerifier(state, req, res);
     
+    if (!codeVerifier) {
+      // Fallback: check server-side state storage (in case cookies were dropped)
+      try {
+        const dbState = await storage.getOauthState(state);
+        if (dbState && dbState.expiresAt && new Date(dbState.expiresAt) > new Date()) {
+          codeVerifier = dbState.codeVerifier as unknown as string;
+        }
+      } catch (dbErr) {
+        console.warn('PKCE state DB lookup failed:', (dbErr as Error)?.message);
+      }
+    }
+
     if (!codeVerifier) {
       console.error('❌ PKCE validation failed:', { 
         state, 
@@ -235,6 +261,9 @@ router.get('/auth/x/callback', async (req, res) => {
       `);
     }
     
+    // Attempt to remove server-side state if present
+    try { await storage.deleteOauthState(state); } catch {}
+
     // Clear OAuth cookie on successful completion
     clearOAuthCookie(res, state);
     
