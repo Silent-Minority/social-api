@@ -14,6 +14,15 @@ router.get('/auth/twitter/callback', (_req, res) => {
   res.redirect('/auth/x/callback');
 });
 
+function resolveRedirectUri(req: express.Request): string {
+  const host = (req.headers["x-forwarded-host"] as string) || req.headers.host || "";
+  const isLocal = /(^localhost:?\d*$)|(^127\.0\.0\.1:?\d*$)|\.replit\.dev$/i.test(host || "");
+  const local = process.env.X_REDIRECT_URI_LOCAL;
+  const configured = process.env.X_REDIRECT_URI;
+  // Prefer explicitly provided LOCAL when we detect local hosts, else default configured
+  return isLocal && local ? local : (configured || local || "");
+}
+
 // Start OAuth flow - redirect to Twitter/X
 router.get('/auth/x/start', async (req, res) => {
   try {
@@ -36,7 +45,7 @@ router.get('/auth/x/start', async (req, res) => {
       return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in environment variables.');
     }
 
-    const redirectUri = process.env.X_REDIRECT_URI;
+    const redirectUri = resolveRedirectUri(req);
     const scopes = process.env.X_SCOPES;
     
     if (!redirectUri || !scopes) {
@@ -105,29 +114,24 @@ router.get('/auth/x/callback', async (req, res) => {
     }
 
     // Retrieve and validate PKCE data (includes explicit state validation)
-    let codeVerifier = retrieveCodeVerifier(state, req, res);
-    
-    if (!codeVerifier) {
-      console.warn('PKCE fallback: cookie missing for state', state);
-      try {
-        const dbState = await storage.getOauthState(state);
-        if (dbState) {
-          console.log('PKCE fallback: DB state found', {
-            state: dbState.state,
-            expiresAt: dbState.expiresAt
-          });
-        }
-        if (dbState && dbState.expiresAt && new Date(dbState.expiresAt) > new Date()) {
-          codeVerifier = dbState.codeVerifier as unknown as string;
-        } else {
-          console.warn('PKCE fallback: DB state missing or expired', {
-            hasState: !!dbState,
-            expiresAt: dbState?.expiresAt
-          });
-        }
-      } catch (dbErr) {
-        console.warn('PKCE state DB lookup failed:', (dbErr as Error)?.message);
+    // Prefer DB-backed state first (works across proxies/instances),
+    // then fall back to the signed cookie if needed.
+    let codeVerifier: string | null = null;
+    try {
+      const dbState = await storage.getOauthState(state);
+      if (dbState && dbState.expiresAt && new Date(dbState.expiresAt) > new Date()) {
+        codeVerifier = (dbState as any).codeVerifier as string;
+        console.log('PKCE primary: DB state used', { state: dbState.state });
+      } else if (dbState) {
+        console.warn('PKCE primary: DB state expired', { state: dbState.state, expiresAt: dbState.expiresAt });
       }
+    } catch (dbErr) {
+      console.warn('PKCE primary DB lookup failed:', (dbErr as Error)?.message);
+    }
+
+    if (!codeVerifier) {
+      console.warn('PKCE secondary: trying cookie for state', state);
+      codeVerifier = retrieveCodeVerifier(state, req, res);
     }
 
     if (!codeVerifier) {
@@ -150,7 +154,7 @@ router.get('/auth/x/callback', async (req, res) => {
     
     const clientId = process.env.X_CLIENT_ID!;
     const clientSecret = process.env.X_CLIENT_SECRET!;
-    const redirectUri = process.env.X_REDIRECT_URI!;
+    const redirectUri = resolveRedirectUri(req);
     
     // Exchange code for tokens
     const tokenData = await exchangeCodeForTokens(

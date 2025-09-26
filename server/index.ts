@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import authRouter from "./src/auth";
+import { oauthDebugRouter } from "./src/routes/oauthDebug";
 import { redactTokens } from "./utils/security";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,6 +75,7 @@ app.use((req, res, next) => {
   
   // Mount the new simplified OAuth routes
   app.use(authRouter);
+  app.use("/api", oauthDebugRouter);
 
   // Note: Do NOT add reverse redirects here.
   // We already expose canonical OAuth routes at /auth/x/* and provide
