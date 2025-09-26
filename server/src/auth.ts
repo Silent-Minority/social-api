@@ -44,6 +44,7 @@ router.get('/auth/x/start', async (req, res) => {
       });
       return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in environment variables.');
     }
+    // Fix: Twitter requires 127.0.0.1 instead of localhost for development (handled via X_REDIRECT_URI_LOCAL)
 
     const redirectUri = resolveRedirectUri(req);
     const scopes = process.env.X_SCOPES;
