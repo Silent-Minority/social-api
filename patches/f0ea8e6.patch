@@ -1,0 +1,150 @@
+From f0ea8e6e4fa1e0bfd7cebc3f37c9bd6ad3e51f71 Mon Sep 17 00:00:00 2001
+From: mirancourtmarketing-creator <mirancourtmarketing@gmail.com>
+Date: Thu, 25 Sep 2025 18:43:22 -0400
+Subject: [PATCH] Fix X OAuth endpoints and env vars
+
+---
+ .env.example        | 20 ++++++++++++++------
+ OAUTH_SOLUTION.md   |  4 ++--
+ server/oauth.ts     |  6 +++---
+ server/routes.ts    |  4 ++--
+ server/src/oauth.ts |  8 ++++----
+ 5 files changed, 25 insertions(+), 17 deletions(-)
+
+diff --git a/.env.example b/.env.example
+index ac3644b..4da4f30 100644
+--- a/.env.example
++++ b/.env.example
+@@ -7,13 +7,21 @@ CORS_ORIGIN=*
+ 
+ # Authentication
+ JWT_SECRET=your-jwt-secret-here
++COOKIE_SECRET=your-cookie-signing-secret
+ 
+-# X (Twitter) API Configuration
+-# Get these from https://developer.twitter.com/
+-X_API_KEY=your-x-api-key-here
+-X_API_SECRET=your-x-api-secret-here
+-X_ACCESS_TOKEN=your-x-access-token-here
+-X_ACCESS_TOKEN_SECRET=your-x-access-token-secret-here
++# X (Twitter) API Configuration (OAuth 2.0)
++# Get these from https://developer.twitter.com/ (X Developer Portal)
++X_CLIENT_ID=your-x-oauth2-client-id
++X_CLIENT_SECRET=your-x-oauth2-client-secret
++X_REDIRECT_URI=https://your-domain.com/auth/x/callback
++# Common default scopes shown; adjust as needed in the Developer Portal
++X_SCOPES=tweet.read tweet.write users.read offline.access
++
++# Legacy (OAuth 1.0a) keys – not used for OAuth2 code flow
++# X_API_KEY=your-x-api-key-here
++# X_API_SECRET=your-x-api-secret-here
++# X_ACCESS_TOKEN=your-x-access-token-here
++# X_ACCESS_TOKEN_SECRET=your-x-access-token-secret-here
+ 
+ # Database (if using PostgreSQL instead of in-memory storage)
+ # DATABASE_URL=postgresql://username:password@localhost:5432/mirancourt_social
+diff --git a/OAUTH_SOLUTION.md b/OAUTH_SOLUTION.md
+index 438e527..79224f8 100644
+--- a/OAUTH_SOLUTION.md
++++ b/OAUTH_SOLUTION.md
+@@ -26,7 +26,7 @@ Since our callback handler can't process the code, you need to exchange it manua
+ 
+ ```bash
+ # Exchange the authorization code for tokens
+-curl -X POST "https://api.twitter.com/2/oauth2/token" \
++curl -X POST "https://api.x.com/2/oauth2/token" \
+   -H "Content-Type: application/x-www-form-urlencoded" \
+   -H "Authorization: Basic $(echo -n 'YOUR_CLIENT_ID:YOUR_CLIENT_SECRET' | base64)" \
+   -d "grant_type=authorization_code" \
+@@ -137,4 +137,4 @@ You should see connected accounts in the response.
+ - **Token Storage**: Uses `social_accounts` table with automatic refresh capability
+ - **Error Handling**: Returns proper error messages in expected format
+ 
+-The system is now ready to post tweets successfully via the `/api/posts` endpoint!
+\ No newline at end of file
++The system is now ready to post tweets successfully via the `/api/posts` endpoint!
+diff --git a/server/oauth.ts b/server/oauth.ts
+index 8356b26..9c16055 100644
+--- a/server/oauth.ts
++++ b/server/oauth.ts
+@@ -4,8 +4,8 @@ import { storage } from "./storage";
+ // OAuth 2.0 PKCE utilities for X (Twitter) API
+ export class TwitterOAuth {
+   private static readonly TWITTER_OAUTH_URL = "https://twitter.com/i/oauth2/authorize";
+-  private static readonly TWITTER_TOKEN_URL = "https://api.twitter.com/2/oauth2/token";
+-  private static readonly TWITTER_API_BASE = "https://api.twitter.com";
++  private static readonly TWITTER_TOKEN_URL = "https://api.x.com/2/oauth2/token";
++  private static readonly TWITTER_API_BASE = "https://api.x.com";
+ 
+   // Generate PKCE code verifier and challenge
+   static generatePKCE(): { codeVerifier: string; codeChallenge: string } {
+@@ -203,4 +203,4 @@ export async function cleanupExpiredOAuthStates(): Promise<void> {
+   // This would be implemented to clean up expired states from the database
+   // For now, we'll leave this as a placeholder for a future cron job
+   console.log("Cleaning up expired OAuth states...");
+-}
+\ No newline at end of file
++}
+diff --git a/server/routes.ts b/server/routes.ts
+index 686b16d..a86e2a8 100644
+--- a/server/routes.ts
++++ b/server/routes.ts
+@@ -513,7 +513,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
+       // Use existing token system instead of accounts object
+       const accessToken = await getValidAccessToken(accountId || 'default');
+ 
+-      const tweetResp = await fetch('https://api.twitter.com/2/tweets', {
++      const tweetResp = await fetch('https://api.x.com/2/tweets', {
+         method: 'POST',
+         headers: {
+           'Content-Type': 'application/json',
+@@ -600,7 +600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
+     const payload = { text: data.text };
+     
+     try {
+-      const response = await fetch('https://api.twitter.com/2/tweets', {
++      const response = await fetch('https://api.x.com/2/tweets', {
+         method: 'POST',
+         headers: headers,
+         body: JSON.stringify(payload)
+diff --git a/server/src/oauth.ts b/server/src/oauth.ts
+index 469070f..f3f3787 100644
+--- a/server/src/oauth.ts
++++ b/server/src/oauth.ts
+@@ -154,7 +154,7 @@ export async function exchangeCodeForTokens(
+ 
+   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+ 
+-  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
++  const response = await fetch('https://api.x.com/2/oauth2/token', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/x-www-form-urlencoded',
+@@ -177,7 +177,7 @@ export async function getUserProfile(accessToken: string): Promise<{
+   username: string;
+   name: string;
+ }> {
+-  const response = await fetch('https://api.twitter.com/2/users/me', {
++  const response = await fetch('https://api.x.com/2/users/me', {
+     headers: {
+       'Authorization': `Bearer ${accessToken}`,
+     },
+@@ -211,7 +211,7 @@ export async function refreshAccessToken(
+ 
+   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+ 
+-  const response = await fetch('https://api.twitter.com/2/oauth2/token', {
++  const response = await fetch('https://api.x.com/2/oauth2/token', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/x-www-form-urlencoded',
+@@ -231,4 +231,4 @@ export async function refreshAccessToken(
+ // Calculate token expiration date from expires_in seconds
+ export function calculateTokenExpiration(expiresInSeconds: number): Date {
+   return new Date(Date.now() + expiresInSeconds * 1000);
+-}
+\ No newline at end of file
++}
+-- 
+2.51.0.windows.1
+
