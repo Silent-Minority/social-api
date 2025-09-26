@@ -36,8 +36,8 @@ router.get('/auth/x/start', async (req, res) => {
       return res.status(500).send('Twitter API credentials not configured. Please set X_CLIENT_ID and X_CLIENT_SECRET in environment variables.');
     }
 
-    // TEMPORARY FIX: Force localhost redirect URI for testing
-    const redirectUri = `http://localhost:${process.env.PORT || 5000}/auth/x/callback`;
+    // Fix: Twitter requires 127.0.0.1 instead of localhost for development
+    const redirectUri = `http://127.0.0.1:${process.env.PORT || 5000}/auth/x/callback`;
     const scopes = process.env.X_SCOPES;
     
     console.log('OAuth redirect URI debug', {
