@@ -79,12 +79,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Compatibility alias for legacy dashboard calls
   // Some clients call /api/auth/twitter; redirect them to the current OAuth start route
   app.get('/api/auth/twitter', (_req, res) => {
-    res.redirect('/auth/x/start');
+    res.redirect('/auth/twitter/start');
   });
 
   // Handle POST mistakenly sent to the legacy path by issuing a 303 to the GET start route
   app.post('/api/auth/twitter', (_req, res) => {
-    res.redirect(303, '/auth/x/start');
+    res.redirect(303, '/auth/twitter/start');
   });
 
   // API status endpoint with connected accounts and posts
@@ -170,8 +170,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const config = {
       port: process.env.PORT || 5000,
       corsOrigin: process.env.CORS_ORIGIN || "*",
-      twitterClientId: !!process.env.TWITTER_CLIENT_ID,
-      twitterClientSecret: !!process.env.TWITTER_CLIENT_SECRET,
+      twitterClientId: !!process.env.X_CLIENT_ID,
+      twitterClientSecret: !!process.env.X_CLIENT_SECRET,
       jwtSecret: process.env.JWT_SECRET ? "configured" : "default",
     };
     res.json(config);
@@ -218,7 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (xAccounts.length === 0) {
         return res.status(400).json({ 
           error: "No connected X account found",
-          suggestion: "Please connect your X account first via /auth/x/start"
+          suggestion: "Please connect your X account first via /auth/twitter/start"
         });
       }
       
@@ -458,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!accountResult) {
         return res.status(400).json({
           error: "No connected X account found",
-          suggestion: "Connect via /auth/x/start"
+          suggestion: "Connect via /auth/twitter/start"
         });
       }
 
@@ -605,7 +605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!access_token) {
       return res.status(401).json({ 
         error: "No connected X account", 
-        suggestion: "/auth/x/start" 
+        suggestion: "/auth/twitter/start" 
       });
     }
     
@@ -645,8 +645,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       version: "1.0.0",
       endpoints: {
         oauth: {
-          start: "GET /auth/x/start",
-          callback: "GET /auth/x/callback"
+          start: "GET /auth/twitter/start",
+          callback: "GET /auth/twitter/callback"
         },
         posting: "POST /api/post",
         metrics: {
