@@ -74,6 +74,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "healthy", timestamp: new Date().toISOString() });
   });
 
+  // Compatibility alias for legacy dashboard calls
+  // Some clients call /api/auth/twitter; redirect them to the current OAuth start route
+  app.get('/api/auth/twitter', (_req, res) => {
+    res.redirect('/auth/x/start');
+  });
+
+  // Handle POST mistakenly sent to the legacy path by issuing a 303 to the GET start route
+  app.post('/api/auth/twitter', (_req, res) => {
+    res.redirect(303, '/auth/x/start');
+  });
+
   // API status endpoint with connected accounts and posts
   app.get("/api/status", async (req, res) => {
     try {
